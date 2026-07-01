@@ -82,8 +82,6 @@ class NegativeApiTestCase(APITestCase):
         # Need a package in repo_deb
         import datetime
 
-        import pytz
-
         from repo.models import Package
 
         pkg = Package.objects.create(
@@ -93,7 +91,7 @@ class NegativeApiTestCase(APITestCase):
             package_name="test",
             version="1.0",
             architecture="all",
-            upload_date=datetime.datetime.now(tz=pytz.utc),
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
             checksum_sha512="dummy",
         )
 

@@ -1,7 +1,6 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import datetime
 
-import pytz
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.authtoken.models import Token
@@ -113,7 +112,7 @@ class AuthPermissionTestCase(APITestCase):
             package_name="test",
             version="1.0",
             architecture="all",
-            upload_date=datetime.datetime.now(tz=pytz.utc),
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
             checksum_sha512="auth_hash",
         )
         response = self.client.delete(
@@ -137,7 +136,7 @@ class AuthPermissionTestCase(APITestCase):
             package_name="test",
             version="2.0",
             architecture="all",
-            upload_date=datetime.datetime.now(tz=pytz.utc),
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
             checksum_sha512="auth_hash_2",
         )
         # Create a dummy file so deletion signal doesn't fail

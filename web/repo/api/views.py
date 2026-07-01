@@ -14,9 +14,8 @@
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
-import pytz
 import rest_framework.exceptions
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -342,7 +341,7 @@ class UploadViewSet(viewsets.ViewSet):
             package.package_uid = stored_filename.replace("/", "-")
 
         package.repo = repo
-        package.upload_date = datetime.now(tz=pytz.utc)
+        package.upload_date = datetime.now(tz=timezone.utc)
         package.filename = filename
         package.build_date = file_info_adapter.get_builddate()
         package.architecture = file_info_adapter.get_architecture()

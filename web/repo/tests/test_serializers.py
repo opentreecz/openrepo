@@ -1,7 +1,6 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import datetime
 
-import pytz
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework.authtoken.models import Token
@@ -117,7 +116,7 @@ class PackageSerializerTestCase(TestCase):
             package_name="test",
             version="1.0",
             architecture="all",
-            upload_date=datetime.datetime.now(tz=pytz.utc),
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
             checksum_sha512="abc",
         )
         self.assertEqual(pkg.relative_path(), "aa/bbccddee")
@@ -131,7 +130,7 @@ class PackageSerializerTestCase(TestCase):
             package_name="testpkg",
             version="1.0",
             architecture="all",
-            upload_date=datetime.datetime.now(tz=pytz.utc),
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
             checksum_sha512="abc123",
         )
         self.assertEqual(Package.objects.filter(package_uid="zz-testpkg").count(), 1)

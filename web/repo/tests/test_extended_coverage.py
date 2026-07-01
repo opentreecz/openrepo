@@ -4,7 +4,6 @@ import os
 import tempfile
 from unittest.mock import MagicMock, patch
 
-import pytz
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -245,7 +244,7 @@ class PackagesViewSetTestCase(APITestCase):
                 package_name=f"pkg{i}",
                 version=f"1.{i}",
                 architecture="all",
-                upload_date=datetime.datetime.now(tz=pytz.utc),
+                upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
                 checksum_sha512=f"hash{i}",
             )
         response = self.client.get(
@@ -264,7 +263,7 @@ class PackagesViewSetTestCase(APITestCase):
             package_name="detailpkg",
             version="2.0",
             architecture="amd64",
-            upload_date=datetime.datetime.now(tz=pytz.utc),
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
             checksum_sha512="detailhash",
         )
         response = self.client.get(
