@@ -4,6 +4,10 @@ on:
   push:
     branches: ['**']
   pull_request:
+  schedule:
+    # Weekly run against latest runner image / apt packages / python-apt HEAD
+    # to catch drift even when nothing in this repo has changed.
+    - cron: '11 4 * * 1'
 
 jobs:
   test:

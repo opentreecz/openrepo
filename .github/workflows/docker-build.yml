@@ -6,6 +6,10 @@ on:
       - 'main'
     tags:
       - 'v*'
+  schedule:
+    # Weekly rebuild against the latest base images (ubuntu:24.04, node:20.14.0)
+    # so security patches in those images land even without a code change.
+    - cron: '17 4 * * 1'
   workflow_dispatch:
 
 jobs:
@@ -47,6 +51,7 @@ jobs:
         with:
           context: .
           push: true
+          pull: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
