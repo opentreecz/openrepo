@@ -5,7 +5,6 @@ import shutil
 import tempfile
 from unittest.mock import MagicMock, patch
 
-import pytz
 from django.conf import settings
 from django.test import TestCase
 
@@ -139,7 +138,7 @@ class BaseRepoAdapterBuildLogTestCase(TestCase):
             package_name="test",
             version="1.0",
             architecture="all",
-            upload_date=datetime.datetime.now(tz=pytz.utc),
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
             checksum_sha512="hash1",
         )
 

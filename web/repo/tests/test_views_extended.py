@@ -3,7 +3,6 @@ import datetime
 import os
 import tempfile
 
-import pytz
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
@@ -45,7 +44,7 @@ class CopyViewSetTestCase(APITestCase):
             package_name="hello",
             version="1.0",
             architecture="all",
-            upload_date=datetime.datetime.now(tz=pytz.utc),
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
             checksum_sha512="copy_hash",
         )
 
@@ -139,7 +138,7 @@ class KeepOnlyLatestTestCase(APITestCase):
             package_name="myapp",
             version="0.9",
             architecture="all",
-            upload_date=datetime.datetime.now(tz=pytz.utc),
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
             checksum_sha512="old_hash",
         )
         # Create a new package in src
@@ -150,7 +149,7 @@ class KeepOnlyLatestTestCase(APITestCase):
             package_name="myapp",
             version="1.0",
             architecture="all",
-            upload_date=datetime.datetime.now(tz=pytz.utc),
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
             checksum_sha512="new_hash",
         )
         response = self.client.post(

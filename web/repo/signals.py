@@ -15,7 +15,6 @@
 import datetime
 import logging
 
-import pytz
 from django.contrib.auth.models import User
 from django.db.models import signals
 from django.dispatch import receiver
@@ -55,7 +54,7 @@ def flag_repo_as_stale(sender, instance, using, **kwargs):
     repo.package_count = pkg_count
 
     # Update the modification date
-    repo.last_updated = datetime.datetime.now(tz=pytz.utc)
+    repo.last_updated = datetime.datetime.now(tz=datetime.timezone.utc)
     repo.save()
 
 
