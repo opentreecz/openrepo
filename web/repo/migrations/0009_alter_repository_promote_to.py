@@ -1,0 +1,17 @@
+import django.db.models.deletion
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    dependencies = [
+        ('repo', '0008_delete_mirror'),
+    ]
+
+    operations = [
+        migrations.AlterField(
+            model_name='repository',
+            name='promote_to',
+            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='repo.repository'),
+        ),
+    ]
