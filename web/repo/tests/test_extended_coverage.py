@@ -296,8 +296,6 @@ class AdapterFileInitTestCase(APITestCase):
 
     def test_create_adapter_deb_type(self):
         """create_adapter returns DebFileAdapter for 'deb' repo type"""
-        import os
-
         from adapters.file import create_adapter
         from adapters.file.deb_adapter import DebFileAdapter
 

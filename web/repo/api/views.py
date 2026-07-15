@@ -49,7 +49,7 @@ from .serializers import (
     UserSerializer,
 )
 from .upload_processor import process_upload
-from .util import MultipleFieldLookupMixin, compute_sha512
+from .util import MultipleFieldLookupMixin
 
 logger = logging.getLogger("openrepo_web")
 
@@ -69,7 +69,10 @@ class ReposViewSet(viewsets.ModelViewSet):
     """
 
     lookup_field = "repo_uid"
-    queryset = Repository.objects.all().order_by("repo_uid").select_related("promote_to").prefetch_related("write_access")
+    queryset = (
+        Repository.objects.all().order_by("repo_uid")
+        .select_related("promote_to").prefetch_related("write_access")
+    )
     serializer_class = RepoSummarySerializer
 
     def get_serializer_class(self):
@@ -269,7 +272,9 @@ class CopyViewSet(viewsets.ViewSet):
         if dst_repo.repo_type == "files":
             package.package_name = package.filename
 
-        if Package.objects.filter(repo=dst_repo, package_name=package.package_name, version=package.version).count() > 0:
+        if Package.objects.filter(
+            repo=dst_repo, package_name=package.package_name, version=package.version
+        ).count() > 0:
             raise rest_framework.exceptions.ParseError(
                 f"Package {package.package_name} v{package.version} already exists in destination repo {dst_repo}"
             )
