@@ -9,7 +9,7 @@ from django.test import TestCase
 
 from adapters.file.deb_adapter import DebFileAdapter
 from adapters.file.rpm_adapter import RpmFileAdapter
-from adapters.repo.deb_repo import DepRepoAdapter
+from adapters.repo.deb_repo import DebRepoAdapter
 from adapters.repo.rpm_repo import RpmRepoAdapter
 from repo.models import Build, Package, PGPSigningKey, Repository
 
@@ -54,7 +54,7 @@ class AdapterTestCase(TestCase):
     @patch("subprocess.run")
     @patch("repo.storage.keyring.PGPKeyring.ensure_key")
     def test_deb_repo_generation(self, mock_ensure_key, mock_run):
-        """Test that DepRepoAdapter triggers the correct commands for repo generation"""
+        """Test that DebRepoAdapter triggers the correct commands for repo generation"""
         # Mock successful subprocess execution
         mock_proc = MagicMock()
         mock_proc.returncode = 0
@@ -79,7 +79,7 @@ class AdapterTestCase(TestCase):
         with open(pkg_file_path, "w") as f:
             f.write("dummy package content")
 
-        adapter = DepRepoAdapter(self.repo)
+        adapter = DebRepoAdapter(self.repo)
         # Create a build object as BaseRepoAdapter needs it for logging
         adapter.build = Build.objects.create(repo=self.repo, build_number=1)
         adapter.packages = Package.objects.filter(repo=self.repo)
@@ -99,7 +99,7 @@ class AdapterTestCase(TestCase):
 
     def test_repo_instructions(self):
         """Test that repo instructions are correctly generated"""
-        adapter = DepRepoAdapter(self.repo)
+        adapter = DebRepoAdapter(self.repo)
         instructions = adapter._get_repo_instructions()
         self.assertIn("apt update", instructions)
         self.assertIn(f"openrepo-{self.repo_uid}.list", instructions)

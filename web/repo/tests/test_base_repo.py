@@ -150,7 +150,8 @@ class BaseRepoAdapterBuildLogTestCase(TestCase):
 
         adapter._copy_packages(dest_dir)
 
-        expected_link = os.path.join(dest_dir, "test.deb")
+        # Symlink uses pool-style name: {package_name}_{version}_{architecture}{ext}
+        expected_link = os.path.join(dest_dir, "test_1.0_all.deb")
         self.assertTrue(os.path.islink(expected_link))
         self.assertEqual(os.readlink(expected_link), src_file)
 

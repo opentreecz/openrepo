@@ -296,8 +296,6 @@ class AdapterFileInitTestCase(APITestCase):
 
     def test_create_adapter_deb_type(self):
         """create_adapter returns DebFileAdapter for 'deb' repo type"""
-        import os
-
         from adapters.file import create_adapter
         from adapters.file.deb_adapter import DebFileAdapter
 
@@ -320,13 +318,13 @@ class AdapterRepoInitTestCase(APITestCase):
         )
 
     def test_get_repo_adapter_deb(self):
-        """get_repo_adapter returns DepRepoAdapter for deb repos"""
+        """get_repo_adapter returns DebRepoAdapter for deb repos"""
         from adapters.repo import get_repo_adapter
-        from adapters.repo.deb_repo import DepRepoAdapter
+        from adapters.repo.deb_repo import DebRepoAdapter
 
         repo = Repository.objects.create(repo_uid="router-deb", repo_type="deb", signing_key=self.signing_key)
         adapter = get_repo_adapter(repo)
-        self.assertIsInstance(adapter, DepRepoAdapter)
+        self.assertIsInstance(adapter, DebRepoAdapter)
 
     def test_get_repo_adapter_rpm(self):
         """get_repo_adapter returns RpmRepoAdapter for rpm repos"""

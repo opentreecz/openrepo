@@ -49,7 +49,7 @@ RPM_VERSION_IGNORE_BUILD_NUM = (
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-s8-h-mhty&_oa)qouzm!_$8s3$yn_u4x$7q$gh7o66cd=3&o_h"
+SECRET_KEY = os.getenv("OPENREPO_SECRET_KEY") or "django-insecure-s8-h-mhty&_oa)qouzm!_$8s3$yn_u4x$7q$gh7o66cd=3&o_h"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("OPENREPO_DEBUG", "FALSE").upper() == "TRUE"
@@ -138,6 +138,7 @@ elif db_type == "postgresql":
             "PASSWORD": os.getenv("OPENREPO_PG_PASSWORD", "postgres"),
             "HOST": os.getenv("OPENREPO_PG_HOSTNAME", "localhost"),
             "PORT": os.getenv("OPENREPO_PG_PORT", "5432"),
+            "CONN_MAX_AGE": int(os.getenv("OPENREPO_PG_CONN_MAX_AGE", "300")),
         }
     }
 else:
@@ -212,7 +213,7 @@ REST_FRAMEWORK = {
         # 'rest_framework.permissions.IsAuthenticated'
         "repo.api.authentication.CustomOpenRepoPermission"
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "repo.api.pagination.OpenRepoPagination",
     "PAGE_SIZE": 2000,
 }
 

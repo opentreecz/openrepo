@@ -18,7 +18,7 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from adapters.repo import get_repo_adapter
-from repo.models import Build, BuildLogLine, Package, PGPSigningKey, Repository
+from repo.models import Build, BuildLogLine, Package, PGPSigningKey, Repository, UploadTask
 
 from .util import ParameterisedHyperlinkedIdentityField
 
@@ -45,17 +45,22 @@ class RepoSummarySerializer(serializers.HyperlinkedModelSerializer):
     href_packages = ParameterisedHyperlinkedIdentityField(
         view_name="package-list", lookup_fields=([("repo_uid", "repo_uid")]), read_only=True
     )
+    promote_to = serializers.SlugRelatedField(slug_field="repo_uid", read_only=True, allow_null=True)
 
     class Meta:
         model = Repository
-        fields = ["href_repo", "href_packages", "repo_uid", "repo_type", "package_count", "last_updated"]
+        fields = [
+            "href_repo",
+            "href_packages",
+            "repo_uid",
+            "repo_type",
+            "package_count",
+            "last_updated",
+            "promote_to",
+        ]
 
 
 class PGPKeySerializer(serializers.HyperlinkedModelSerializer):
-
-    # href_key = ParameterisedHyperlinkedIdentityField(view_name='signing-keys', lookup_fields=([ ('fingerprint', 'fingerprint')]),
-    #                                            read_only=True)
-    # href_key = serializers.HyperlinkedIdentityField(view_name='pgp-keys', format='html')
 
     class Meta:
         model = PGPSigningKey
@@ -105,7 +110,6 @@ class RepoDetailSerializer(serializers.HyperlinkedModelSerializer):
         return repo_adapter._get_repo_instructions()
 
     def validate(self, attrs):
-        # Apply custom validation either here, or in the view.
         allowed_uid_chars = set(string.ascii_letters + string.digits + "-_")
 
         uuid_is_valid = set(attrs["repo_uid"]) <= allowed_uid_chars
@@ -114,14 +118,45 @@ class RepoDetailSerializer(serializers.HyperlinkedModelSerializer):
                 {"repo_uid": "repo_uid may only contain alphanumeric characters, dashes, and underscores"}
             )
 
-        disallowed_names = ["back", "api", "admin", "api-auth", "static"]
+        disallowed_names = [
+            "back", "api", "admin", "api-auth", "static",
+            "users", "repos", "signingkeys", "builds", "buildlogs",
+            "whoami", "upload-status",
+        ]
         if attrs["repo_uid"] in disallowed_names:
             raise serializers.ValidationError(
                 {"repo_uid": "Repo UID cannot be any of the following special words: " + ", ".join(disallowed_names)}
             )
 
-        if attrs["signing_key"] is None or attrs["signing_key"] == "":
+        # signing_key required only on create
+        if self.instance is None and (attrs.get("signing_key") is None or attrs.get("signing_key") == ""):
             raise serializers.ValidationError({"signing_key": "Signing key is required"})
+
+        promote_to = attrs.get("promote_to")
+        if promote_to:
+            conflict = Repository.objects.filter(promote_to=promote_to)
+            if self.instance:
+                conflict = conflict.exclude(pk=self.instance.pk)
+            if conflict.exists():
+                raise serializers.ValidationError(
+                    {
+                        "promote_to": f"Repo '{promote_to.repo_uid}' is already the promotion target of "
+                        f"'{conflict.first().repo_uid}'"
+                    }
+                )
+
+            # Prevent circular promotion chains
+            if self.instance:
+                current = promote_to
+                while current is not None:
+                    if current.pk == self.instance.pk:
+                        raise serializers.ValidationError(
+                            {
+                                "promote_to": f"Setting promote_to to '{promote_to.repo_uid}' would create "
+                                "a circular promotion chain"
+                            }
+                        )
+                    current = current.promote_to
 
         return attrs
 
@@ -156,7 +191,7 @@ class PackageDetailSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class CopySerializer(serializers.Serializer):
-    package_file = serializers.FileField()
+    dest_repo_uid = serializers.CharField()
 
     class Meta:
         fields = ["dest_repo_uid"]
@@ -169,12 +204,28 @@ class UploadSerializer(serializers.Serializer):
         fields = ["package_file"]
 
 
+class UploadTaskSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = UploadTask
+        fields = [
+            "id",
+            "status",
+            "filename",
+            "filesize",
+            "error_message",
+            "result_data",
+            "created_at",
+            "completed_at",
+        ]
+
+
 class BuildSerializer(serializers.ModelSerializer):
     repo_uid = serializers.CharField(source="repo.repo_uid")
 
     class Meta:
         model = Build
-        fields = ["repo_uid", "timestamp", "build_number", "completion_status"]
+        fields = ["repo_uid", "timestamp", "build_number", "completion_status", "total_duration_sec"]
 
 
 class BuildLogSerializer(serializers.ModelSerializer):

@@ -19,7 +19,7 @@ class PGPKeyringInitTestCase(TestCase):
         """PGPKeyring creates keyring directory when it does not exist"""
         with patch("gnupg.GPG") as mock_gpg_cls:
             mock_gpg_cls.return_value = MagicMock()
-            ring = PGPKeyring()
+            PGPKeyring()
             self.assertTrue(os.path.isdir(settings.KEYRING_PATH))
 
     def test_init_with_gnupghome_kwarg(self):
@@ -27,7 +27,7 @@ class PGPKeyringInitTestCase(TestCase):
         os.makedirs(settings.KEYRING_PATH, exist_ok=True)
         mock_gpg = MagicMock()
         with patch("gnupg.GPG", return_value=mock_gpg) as mock_gpg_cls:
-            ring = PGPKeyring()
+            PGPKeyring()
             mock_gpg_cls.assert_called_with(gnupghome=settings.KEYRING_PATH)
 
     def test_init_fallback_to_homedir(self):
