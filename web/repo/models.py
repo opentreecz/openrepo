@@ -13,6 +13,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import uuid
 
 from django.contrib.auth.models import User
 from django.db import models
@@ -31,6 +32,7 @@ class PGPSigningKey(models.Model):
     fingerprint = models.CharField(db_index=True, unique=True, max_length=65535)
     private_key_pem = models.CharField(max_length=65536)
     public_key_pem = models.CharField(max_length=65536)
+    passphrase = models.CharField(max_length=65536, blank=True, default="")
 
     creation_date = models.DateTimeField(auto_now_add=True, blank=True)
 
@@ -53,7 +55,7 @@ class Repository(models.Model):
     repo_type = models.CharField(max_length=128, choices=REPO_TYPES, db_index=True)
 
     signing_key = models.ForeignKey(PGPSigningKey, blank=True, null=True, on_delete=models.PROTECT)
-    promote_to = models.ForeignKey("self", blank=True, null=True, on_delete=models.CASCADE)
+    promote_to = models.OneToOneField("self", blank=True, null=True, on_delete=models.CASCADE)
 
     # When a newer package of the same name is uploaded, delete the older versions
     keep_only_latest = models.BooleanField(default=False)
@@ -111,11 +113,6 @@ class Package(models.Model):
         )
 
 
-class Mirror(models.Model):
-    # Don't allow the repo to be deleted without first deleting the mirror(s)
-    repo = models.ForeignKey(Repository, on_delete=models.PROTECT)
-
-
 class Build(models.Model):
     repo = models.ForeignKey(Repository, db_index=True, on_delete=models.CASCADE)
     build_number = models.BigIntegerField(db_index=True)
@@ -136,6 +133,8 @@ class Build(models.Model):
         ],
     )
 
+    total_duration_sec = models.FloatField(blank=True, null=True)
+
     class Meta:
         unique_together = (
             "repo",
@@ -152,3 +151,18 @@ class BuildLogLine(models.Model):
     line_number = models.IntegerField(db_index=True)
     execution_time_sec = models.FloatField(blank=True, null=True)
     exec_complete = models.BooleanField(default=False)
+
+
+class UploadTask(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    repo = models.ForeignKey(Repository, on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, default="uploading")
+    filename = models.CharField(max_length=65536)
+    filesize = models.BigIntegerField(default=0)
+    overwrite = models.BooleanField(default=False)
+    stored_path = models.CharField(max_length=65536)
+    sha512 = models.CharField(max_length=512, blank=True)
+    error_message = models.TextField(blank=True)
+    result_data = models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
