@@ -7,9 +7,15 @@ services:
     ports:
       - "7376:8080"
     depends_on:
-      - "django"
+      django:
+        condition: service_healthy
     volumes:
       - openrepo-data:/var/lib/openrepo
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   django:
     build: .
@@ -25,8 +31,9 @@ services:
       - OPENREPO_DB_TYPE=postgresql
       - OPENREPO_PG_DATABASE=openrepo
       - OPENREPO_PG_USERNAME=postgres
-      - OPENREPO_PG_PASSWORD=postgres
+      - OPENREPO_PG_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
       - OPENREPO_PG_HOSTNAME=db
+      - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-}
     depends_on:
       db:
         condition: service_healthy
@@ -48,11 +55,17 @@ services:
       - OPENREPO_DB_TYPE=postgresql
       - OPENREPO_PG_DATABASE=openrepo
       - OPENREPO_PG_USERNAME=postgres
-      - OPENREPO_PG_PASSWORD=postgres
+      - OPENREPO_PG_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
       - OPENREPO_PG_HOSTNAME=db
+      - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-}
     depends_on:
       django:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'manage.py runworker' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   db:
     image: postgres:16-alpine
@@ -60,7 +73,7 @@ services:
       - "5432"
     restart: unless-stopped
     environment:
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
       - POSTGRES_USER=postgres
       - POSTGRES_DB=openrepo
     volumes:
