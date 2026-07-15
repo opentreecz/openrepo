@@ -62,12 +62,11 @@ class NegativeApiTestCase(APITestCase):
         self.assertIn("repo_uid", response.data)
 
     def test_upload_to_nonexistent_repo(self):
-        """Test uploading to a repo that doesn't exist"""
-        # The current app uses Repository.objects.get() which raises DoesNotExist instead of 404
-        with self.assertRaises(Repository.DoesNotExist):
-            self.client.post(
-                "/api/ghost-repo/upload/", {"package_file": "dummy"}, HTTP_AUTHORIZATION=f"Token {self.admin_token}"
-            )
+        """Test uploading to a repo that doesn't exist returns 404"""
+        response = self.client.post(
+            "/api/ghost-repo/upload/", {"package_file": "dummy"}, HTTP_AUTHORIZATION=f"Token {self.admin_token}"
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_promote_without_target(self):
         """Test promotion when no promote_to is configured"""

@@ -13,6 +13,8 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import threading
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -23,11 +25,14 @@ from rest_framework.test import APITestCase
 from repo.models import Package, PGPSigningKey, Repository
 
 
+def _run_thread_inline(self):
+    """Patch threading.Thread.start to run the target inline (avoids SQLite cross-thread issues)."""
+    self.run()
+
+
 class RepoRestApiTestCase(APITestCase):
     def setUp(self):
 
-        # print("SETTING UP")
-        # setup authentication
         User = get_user_model()
         self.user = User.objects.create_superuser(username="matt", email="matt@test.com", password="4242424242")
 
@@ -52,7 +57,6 @@ class RepoRestApiTestCase(APITestCase):
 
     def tearDown(self):
         pass
-        # print("TEARING DOWN")
 
     def test_repo_create_delete(self):
         """Create, list, and delete a repo"""
@@ -81,6 +85,7 @@ class RepoRestApiTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Repository.objects.count(), 0)
 
+    @patch.object(threading.Thread, "start", _run_thread_inline)
     def test_package_upload_delete(self):
 
         REPO_UID = "pkgrepo"
@@ -109,10 +114,23 @@ class RepoRestApiTestCase(APITestCase):
                 HTTP_AUTHORIZATION=self.http_auth,
             )
 
+        # Upload returns 202 Accepted with a task_id; processing runs inline due to mock
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertIn("task_id", response.data)
+
+        task_id = response.data["task_id"]
+
+        # Poll upload status endpoint to confirm processing completed
+        status_response = self.client.get(
+            f"/api/upload-status/{task_id}/",
+            HTTP_AUTHORIZATION=self.http_auth,
+        )
+        self.assertEqual(status_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(status_response.data["status"], "completed")
+
         package = Package.objects.get()
         disk_path = os.path.join(settings.STORAGE_PATH, package.package_uid.replace("-", "/"))
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(Package.objects.count(), 1)
         self.assertTrue(os.path.isfile(disk_path))
 

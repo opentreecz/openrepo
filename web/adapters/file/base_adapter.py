@@ -12,22 +12,26 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import logging
+
+logger = logging.getLogger("openrepo_web")
+
 
 class RepoFileAdapter:
     def __init__(self, filepath, original_filename):
         pass
 
     def get_name(self):
-        raise NotImplementedError("Subclasses must implement get_name()")
+        logger.warning("This function should never be called directly, only subclasses")
 
     def get_architecture(self):
-        raise NotImplementedError("Subclasses must implement get_architecture()")
+        logger.warning("This function should never be called directly, only subclasses")
 
     def get_version(self):
-        raise NotImplementedError("Subclasses must implement get_version()")
+        logger.warning("This function should never be called directly, only subclasses")
 
     def get_description(self):
-        raise NotImplementedError("Subclasses must implement get_description()")
+        logger.warning("This function should never be called directly, only subclasses")
 
     def get_builddate(self):
-        raise NotImplementedError("Subclasses must implement get_builddate()")
+        logger.warning("This function should never be called directly, only subclasses")

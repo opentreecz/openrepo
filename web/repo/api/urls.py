@@ -29,6 +29,7 @@ router.register(r"buildlogs", views.BuildLogViewSet)
 urlpatterns = [
     path("", include(router.urls)),
     path("whoami", views.WhoAmIViewSet.as_view({"get": "retrieve"})),
+    path(r"upload-status/<uuid:task_id>/", views.UploadStatusView.as_view({"get": "retrieve"}), name="upload-status"),
     path(
         r"<slug:repo_uid>/",
         views.RepoViewSet.as_view({"get": "retrieve", "put": "update", "delete": "destroy"}),

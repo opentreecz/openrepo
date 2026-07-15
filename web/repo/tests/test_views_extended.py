@@ -2,6 +2,8 @@
 import datetime
 import os
 import tempfile
+import threading
+from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -313,26 +315,48 @@ class OverwriteUploadTestCase(APITestCase):
             )
         return response
 
+    @patch.object(threading.Thread, "start", lambda self: self.run())
     def test_upload_duplicate_without_overwrite_fails(self):
         """Uploading the same package twice without overwrite fails"""
         self._upload_deb()
         response = self._upload_deb()
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("already exists", response.data["detail"])
+        # Async upload returns 202; the UploadTask status will be 'failed' with an error
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        task_id = response.data["task_id"]
+        status_response = self.client.get(
+            f"/api/upload-status/{task_id}/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(status_response.data["status"], "failed")
+        self.assertIn("already exists", status_response.data["error_message"])
 
+    @patch.object(threading.Thread, "start", lambda self: self.run())
     def test_upload_duplicate_with_overwrite_succeeds(self):
         """Uploading the same package twice with overwrite=true replaces it"""
         self._upload_deb()
         response = self._upload_deb(overwrite="true")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        task_id = response.data["task_id"]
+        status_response = self.client.get(
+            f"/api/upload-status/{task_id}/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(status_response.data["status"], "completed")
         # Should still only have one package
         self.assertEqual(Package.objects.filter(repo=self.repo, package_name="hello-world").count(), 1)
 
+    @patch.object(threading.Thread, "start", lambda self: self.run())
     def test_upload_overwrite_yes_string(self):
         """overwrite='yes' is treated as True"""
         self._upload_deb()
         response = self._upload_deb(overwrite="yes")
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        task_id = response.data["task_id"]
+        status_response = self.client.get(
+            f"/api/upload-status/{task_id}/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(status_response.data["status"], "completed")
 
 
 class PGPKeyApiTestCase(APITestCase):
