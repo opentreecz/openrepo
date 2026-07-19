@@ -157,3 +157,29 @@ class AuthPermissionTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["username"], "regularuser")
         self.assertFalse(response.data["is_superuser"])
+
+
+class CustomOpenRepoPermissionUnitTestCase(APITestCase):
+    """Direct unit tests for CustomOpenRepoPermission.has_object_permission fallback branch."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.regular_user = User.objects.create_user(username="permfallback_user", password="password123")
+
+    def test_write_to_unrecognized_object_type_denied_by_default(self):
+        """Objects that are neither Repository nor Package are denied write access by default"""
+        from unittest.mock import MagicMock
+
+        from repo.api.authentication import CustomOpenRepoPermission
+
+        permission = CustomOpenRepoPermission()
+        request = MagicMock()
+        request.method = "POST"
+        request.user = self.regular_user
+        request.user.is_superuser = False
+
+        view = MagicMock()
+        unrecognized_obj = object()
+
+        result = permission.has_object_permission(request, view, unrecognized_obj)
+        self.assertFalse(result)

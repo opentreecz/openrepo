@@ -155,6 +155,67 @@ class BaseRepoAdapterBuildLogTestCase(TestCase):
         self.assertTrue(os.path.islink(expected_link))
         self.assertEqual(os.readlink(expected_link), src_file)
 
+    def test_copy_packages_skips_missing_source_file(self):
+        """_copy_packages logs a message and skips packages whose source file is gone"""
+        pkg = Package.objects.create(
+            repo=self.repo,
+            package_uid="missing-src-uid",
+            filename="missing.deb",
+            package_name="missing",
+            version="1.0",
+            architecture="all",
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
+            checksum_sha512="hash-missing",
+        )
+
+        adapter = self._make_adapter()
+        adapter.packages = [pkg]
+
+        dest_dir = os.path.join(settings.REPO_WWW_PATH, "symlink_missing_test")
+        os.makedirs(dest_dir)
+
+        # Source file for this package was never created on disk.
+        adapter._copy_packages(dest_dir)
+
+        expected_link = os.path.join(dest_dir, "missing_1.0_all.deb")
+        self.assertFalse(os.path.exists(expected_link))
+        log_line = BuildLogLine.objects.filter(build=adapter.build).latest("id")
+        self.assertIn("Unable to find source package file", log_line.message)
+
+    def test_copy_packages_replaces_stale_symlink(self):
+        """_copy_packages removes a pre-existing symlink at the destination before re-linking"""
+        src_dir = os.path.join(settings.STORAGE_PATH, "bb")
+        os.makedirs(src_dir, exist_ok=True)
+        src_file = os.path.join(src_dir, "ffgghh")
+        with open(src_file, "w") as f:
+            f.write("dummy package v2")
+
+        pkg = Package.objects.create(
+            repo=self.repo,
+            package_uid="bb-ffgghh",
+            filename="stale.deb",
+            package_name="stale",
+            version="2.0",
+            architecture="all",
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
+            checksum_sha512="hash-stale",
+        )
+
+        adapter = self._make_adapter()
+        adapter.packages = [pkg]
+
+        dest_dir = os.path.join(settings.REPO_WWW_PATH, "symlink_stale_test")
+        os.makedirs(dest_dir)
+
+        # Pre-create a stale symlink pointing somewhere else at the destination path.
+        expected_link = os.path.join(dest_dir, "stale_2.0_all.deb")
+        os.symlink("/nonexistent/old/target", expected_link)
+
+        adapter._copy_packages(dest_dir)
+
+        self.assertTrue(os.path.islink(expected_link))
+        self.assertEqual(os.readlink(expected_link), src_file)
+
     @patch("subprocess.run")
     def test_execute_commands_returns_true_on_success(self, mock_run):
         """_execute_commands returns True when all commands succeed"""
@@ -290,6 +351,36 @@ class SetupRepoTestCase(TestCase):
         self.assertFalse(result)
         build = Build.objects.get(repo=self.repo)
         self.assertEqual(build.completion_status, Build.STATUS_COMPLETE_ERROR)
+
+    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    def test_setup_repo_removes_preexisting_dest_dir(self, mock_ensure_key):
+        """setup_repo wipes out a stale versioned directory that already exists before regenerating"""
+        # Pre-create the directory setup_repo is about to use for build #1, with a leftover file in it.
+        dest_dir = os.path.join(settings.REPO_WWW_PATH, f"{self.repo.repo_uid}.{1:=09}")
+        os.makedirs(dest_dir)
+        leftover_file = os.path.join(dest_dir, "stale_leftover.txt")
+        with open(leftover_file, "w") as f:
+            f.write("should be removed")
+
+        adapter = GenericRepoAdapter(self.repo)
+        result = adapter.setup_repo()
+
+        self.assertTrue(result)
+        self.assertFalse(os.path.exists(leftover_file))
+        self.assertTrue(os.path.isdir(dest_dir))
+
+    @patch("adapters.repo.generic_repo.GenericRepoAdapter._generate_repo_structure", side_effect=RuntimeError("boom"))
+    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    def test_setup_repo_records_exception_status(self, mock_ensure_key, mock_gen):
+        """setup_repo catches exceptions from _generate_repo_structure, logs them, and marks the build failed"""
+        adapter = GenericRepoAdapter(self.repo)
+        result = adapter.setup_repo()
+
+        self.assertFalse(result)
+        build = Build.objects.get(repo=self.repo)
+        self.assertEqual(build.completion_status, Build.STATUS_COMPLETE_ERROR)
+        log_line = BuildLogLine.objects.filter(build=build).latest("id")
+        self.assertIn("Exception processing repo", log_line.command)
 
 
 class GenericRepoAdapterTestCase(TestCase):

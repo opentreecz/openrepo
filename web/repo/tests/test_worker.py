@@ -94,3 +94,65 @@ class WorkerTestCase(TestCase):
         self.assertFalse(self.repo.is_stale)
         self.assertTrue(mock_adapter.setup_repo.called)
         self.assertIsNone(cl.get_next_task())
+
+    @patch("repo.worker.bgworker.time.sleep")
+    @patch("repo.worker.bgworker.get_repo_adapter")
+    def test_run_processes_task_and_exits_on_stop(self, mock_get_adapter, mock_sleep):
+        """BackgroundWorker.run() picks up a queued repo, refreshes it, then stops"""
+        mock_adapter = MagicMock()
+        mock_get_adapter.return_value = mock_adapter
+
+        cl = ChoreList()
+        cl.set_needs_clean(self.repo.repo_uid)
+
+        worker = BackgroundWorker(cl)
+
+        def stop_after_first_sleep(*args, **kwargs):
+            worker.stay_alive = False
+
+        mock_sleep.side_effect = stop_after_first_sleep
+
+        worker.run()
+
+        self.repo.refresh_from_db()
+        self.assertFalse(self.repo.is_stale)
+        mock_adapter.setup_repo.assert_called_once()
+        self.assertIsNone(cl.get_next_task())
+
+    @patch("repo.worker.bgworker.time.sleep")
+    def test_run_with_no_pending_tasks(self, mock_sleep):
+        """BackgroundWorker.run() sleeps and loops when there is nothing to do"""
+        cl = ChoreList()
+        worker = BackgroundWorker(cl)
+
+        def stop_after_first_sleep(*args, **kwargs):
+            worker.stay_alive = False
+
+        mock_sleep.side_effect = stop_after_first_sleep
+
+        worker.run()
+
+        mock_sleep.assert_called_once()
+
+    @patch("repo.worker.bgworker.time.sleep")
+    @patch("repo.worker.bgworker.get_repo_adapter")
+    def test_run_survives_exception_and_still_marks_task_done(self, mock_get_adapter, mock_sleep):
+        """BackgroundWorker.run() logs and continues if the adapter raises, still releasing the task"""
+        mock_adapter = MagicMock()
+        mock_adapter.setup_repo.side_effect = RuntimeError("boom")
+        mock_get_adapter.return_value = mock_adapter
+
+        cl = ChoreList()
+        cl.set_needs_clean(self.repo.repo_uid)
+
+        worker = BackgroundWorker(cl)
+
+        def stop_after_first_sleep(*args, **kwargs):
+            worker.stay_alive = False
+
+        mock_sleep.side_effect = stop_after_first_sleep
+
+        worker.run()
+
+        # cleaning_done() runs in a finally block even though setup_repo() raised
+        self.assertIsNone(cl.get_next_task())

@@ -104,6 +104,47 @@ class CopyViewSetTestCase(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_copy_from_nonexistent_source_repo_fails(self):
+        """Copying from a non-existent source repo returns 404"""
+        response = self.client.post(
+            f"/api/nonexistent-src-repo/pkg/{self.pkg.package_uid}/copy/",
+            {"dest_repo_uid": self.repo_deb2.repo_uid},
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("Source repo_uid", response.data["detail"])
+
+    def test_copy_nonexistent_package_fails(self):
+        """Copying a package_uid that doesn't exist in the source repo returns 404"""
+        response = self.client.post(
+            f"/api/{self.repo_deb.repo_uid}/pkg/nonexistent-pkg-uid/copy/",
+            {"dest_repo_uid": self.repo_deb2.repo_uid},
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertIn("not found in repo", response.data["detail"])
+
+    def test_copy_identical_package_uid_with_different_metadata_fails(self):
+        """A pre-existing Package with the same package_uid but different name/version still blocks the copy"""
+        Package.objects.create(
+            repo=self.repo_deb2,
+            package_uid=self.pkg.package_uid,
+            filename="other.deb",
+            package_name="totally-different-name",
+            version="9.9",
+            architecture="all",
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
+            checksum_sha512="other_hash",
+        )
+
+        response = self.client.post(
+            f"/api/{self.repo_deb.repo_uid}/pkg/{self.pkg.package_uid}/copy/",
+            {"dest_repo_uid": self.repo_deb2.repo_uid},
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("identical package already exists", response.data["detail"])
+
 
 class KeepOnlyLatestTestCase(APITestCase):
     """Test keep_only_latest flag behavior during upload and copy."""

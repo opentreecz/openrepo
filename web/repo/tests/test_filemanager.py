@@ -1,6 +1,7 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import os
 import tempfile
+from unittest.mock import patch
 
 from django.conf import settings
 from django.test import TestCase
@@ -67,6 +68,18 @@ class FileManagerTestCase(TestCase):
         """delete() on a non-existent path does not raise"""
         fm = RepoFileManager()
         fm.delete("nonexistent/file")  # should not raise
+
+    def test_get_filepath_retries_on_collision(self):
+        """get_filepath regenerates the name if the first candidate already exists on disk"""
+        fm = RepoFileManager()
+        with patch("os.path.isfile", side_effect=[True, False]) as mock_isfile:
+            with patch.object(
+                fm, "_generate_random_filename", side_effect=["colliding/name", "fresh/name"]
+            ) as mock_gen:
+                path = fm.get_filepath()
+        self.assertEqual(path, "fresh/name")
+        self.assertEqual(mock_gen.call_count, 2)
+        self.assertEqual(mock_isfile.call_count, 2)
 
     def test_get_filepath_all_lowercase_alpha(self):
         """Generated paths contain only lowercase letters"""

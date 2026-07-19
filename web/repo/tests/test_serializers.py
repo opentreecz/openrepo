@@ -96,6 +96,86 @@ class SerializerValidationTestCase(APITestCase):
         self.assertEqual(response.status_code, 201)
 
 
+class PromoteToValidationTestCase(APITestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="admin_promote", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+        self.signing_key = PGPSigningKey.objects.create(
+            name="Promote Key",
+            email="promote@example.com",
+            fingerprint="PROMOTE_FP_1234",
+            public_key_pem="pub",
+            private_key_pem="priv",
+        )
+        self.auth = f"Token {self.admin_token}"
+
+    def _create_repo(self, repo_uid, promote_to=None):
+        data = {"repo_uid": repo_uid, "repo_type": "deb", "signing_key": self.signing_key.fingerprint}
+        if promote_to is not None:
+            data["promote_to"] = promote_to
+        response = self.client.post("/api/repos/", data, HTTP_AUTHORIZATION=self.auth, format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        return response.data["repo_uid"]
+
+    def test_two_repos_cannot_promote_to_the_same_target(self):
+        """A repo_uid already used as someone's promote_to target can't be claimed again"""
+        target = self._create_repo("promo-target")
+        self._create_repo("promo-source-a", promote_to=target)
+        self._create_repo("promo-source-b")
+
+        response = self.client.put(
+            "/api/promo-source-b/",
+            {"repo_uid": "promo-source-b", "repo_type": "deb", "promote_to": target},
+            HTTP_AUTHORIZATION=self.auth,
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("promote_to", response.data)
+
+    def test_updating_repo_with_its_own_existing_promote_to_is_not_a_conflict(self):
+        """Re-saving a repo that already owns a promote_to target doesn't self-conflict"""
+        target = self._create_repo("promo-target-2")
+        self._create_repo("promo-source-c", promote_to=target)
+
+        response = self.client.put(
+            "/api/promo-source-c/",
+            {"repo_uid": "promo-source-c", "repo_type": "deb", "promote_to": target},
+            HTTP_AUTHORIZATION=self.auth,
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+
+    def test_direct_circular_promotion_rejected(self):
+        """A -> B, then trying to set B -> A is rejected as circular"""
+        self._create_repo("circ-a")
+        self._create_repo("circ-b", promote_to="circ-a")
+
+        response = self.client.put(
+            "/api/circ-a/",
+            {"repo_uid": "circ-a", "repo_type": "deb", "promote_to": "circ-b"},
+            HTTP_AUTHORIZATION=self.auth,
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("circular", str(response.data))
+
+    def test_indirect_circular_promotion_rejected(self):
+        """A -> B -> C, then trying to set C -> A is rejected as circular"""
+        self._create_repo("chain-a")
+        self._create_repo("chain-b", promote_to="chain-a")
+        self._create_repo("chain-c", promote_to="chain-b")
+
+        response = self.client.put(
+            "/api/chain-a/",
+            {"repo_uid": "chain-a", "repo_type": "deb", "promote_to": "chain-c"},
+            HTTP_AUTHORIZATION=self.auth,
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("circular", str(response.data))
+
+
 class PackageSerializerTestCase(TestCase):
     def setUp(self):
         self.signing_key = PGPSigningKey.objects.create(

@@ -275,6 +275,118 @@ class PackagesViewSetTestCase(APITestCase):
         self.assertEqual(response.data["version"], "2.0")
         self.assertEqual(response.data["architecture"], "amd64")
 
+    def test_package_list_ordering_by_name_ascending(self):
+        """GET /api/<repo>/packages/?ordering=package_name sorts case-insensitively ascending"""
+        for name in ["Zebra", "apple", "Mango"]:
+            Package.objects.create(
+                repo=self.repo,
+                package_uid=f"uid-{name}",
+                filename=f"{name}.deb",
+                package_name=name,
+                version="1.0",
+                architecture="all",
+                upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
+                checksum_sha512=f"hash-{name}",
+            )
+        response = self.client.get(
+            f"/api/{self.repo.repo_uid}/packages/?ordering=package_name",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [pkg["package_name"] for pkg in response.data["results"]]
+        self.assertEqual(names, ["apple", "Mango", "Zebra"])
+
+    def test_package_list_ordering_by_name_descending(self):
+        """GET /api/<repo>/packages/?ordering=-package_name sorts case-insensitively descending"""
+        for name in ["Zebra", "apple", "Mango"]:
+            Package.objects.create(
+                repo=self.repo,
+                package_uid=f"uid-desc-{name}",
+                filename=f"{name}.deb",
+                package_name=name,
+                version="1.0",
+                architecture="all",
+                upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
+                checksum_sha512=f"hash-desc-{name}",
+            )
+        response = self.client.get(
+            f"/api/{self.repo.repo_uid}/packages/?ordering=-package_name",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        names = [pkg["package_name"] for pkg in response.data["results"]]
+        self.assertEqual(names, ["Zebra", "Mango", "apple"])
+
+    def test_package_list_ordering_by_other_field_passthrough(self):
+        """GET /api/<repo>/packages/?ordering=version uses the default (non-Lower) ordering path"""
+        for version in ["3.0", "1.0", "2.0"]:
+            # package_uid feeds a slug-typed URL segment, so it can't contain dots.
+            uid_suffix = version.replace(".", "-")
+            Package.objects.create(
+                repo=self.repo,
+                package_uid=f"uid-ver-{uid_suffix}",
+                filename=f"{version}.deb",
+                package_name="samepkg",
+                version=version,
+                architecture="all",
+                upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
+                checksum_sha512=f"hash-ver-{version}",
+            )
+        response = self.client.get(
+            f"/api/{self.repo.repo_uid}/packages/?ordering=version",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        versions = [pkg["version"] for pkg in response.data["results"]]
+        self.assertEqual(versions, ["1.0", "2.0", "3.0"])
+
+
+class PGPKeyDownloadTestCase(APITestCase):
+    """Test the PGP signing key /download/ action."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="pgpdl_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+        self.signing_key = PGPSigningKey.objects.create(
+            name="Download Key",
+            email="download@example.com",
+            fingerprint="ABCDEF00112233445566",
+            public_key_pem="-----BEGIN PGP PUBLIC KEY BLOCK-----\ndummy\n-----END PGP PUBLIC KEY BLOCK-----",
+            private_key_pem="priv",
+        )
+
+    def test_download_returns_public_key_with_attachment_headers(self):
+        """GET /api/signingkeys/<fp>/download/ returns the ASCII-armored public key"""
+        response = self.client.get(
+            f"/api/signingkeys/{self.signing_key.fingerprint}/download/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.content.decode(), self.signing_key.public_key_pem)
+        self.assertEqual(response["Content-Type"], "application/pgp-keys")
+        self.assertIn("attachment", response["Content-Disposition"])
+        self.assertIn(self.signing_key.fingerprint[-16:], response["Content-Disposition"])
+
+
+class UploadStatusViewTestCase(APITestCase):
+    """Test the upload-status polling endpoint."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="uploadstatus_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+
+    def test_status_for_nonexistent_task_returns_404(self):
+        """GET /api/upload-status/<random-uuid>/ returns 404 when the task doesn't exist"""
+        import uuid
+
+        response = self.client.get(
+            f"/api/upload-status/{uuid.uuid4()}/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
 
 class AdapterFileInitTestCase(APITestCase):
     """Test the create_adapter factory function."""
