@@ -36,16 +36,10 @@
   </template>
   
   <script lang="ts">
-  import NavBar from '@/components/nav_bar.vue'
-  import { defineComponent } from 'vue'
-  
   export default {
     name: 'App',
     props: [ 'message'],
-    components: {
-      NavBar
-    },
-    watch: { 
+    watch: {
         message: function(newVal, oldVal) { // watch it
             this.show = true;
         }

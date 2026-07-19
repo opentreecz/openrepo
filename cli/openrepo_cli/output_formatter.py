@@ -15,7 +15,7 @@
 import logging
 import json
 from prettytable import PrettyTable
-from prettytable import PLAIN_COLUMNS, SINGLE_BORDER
+from prettytable import SINGLE_BORDER
 
 logger = logging.getLogger('openrepo_cli')
 
@@ -47,8 +47,8 @@ class OutputFormatter:
         out_table.field_names = ['property', 'value']
         out_table.align["property"] = "r"
         out_table.align["value"] = "l"
-        for k,v in props.items():
-            out_table.add_row([k,v])
+        for k, v in props.items():
+            out_table.add_row([k, v])
 
         logger.info("\n" + out_table.get_string(sortby='property'))
 
@@ -84,7 +84,3 @@ class OutputFormatter:
             else:
                 # Assume this has properties
                 self._properties(data)
-
-
-
-

@@ -45,3 +45,22 @@ jobs:
       - name: Run tests
         working-directory: web
         run: python manage.py test repo.tests --verbosity=2
+
+  cli-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install CLI dependencies
+        working-directory: cli
+        run: pip install -r requirements.txt
+
+      - name: Run CLI tests
+        working-directory: cli
+        run: PYTHONPATH=. python tests/test_cli.py

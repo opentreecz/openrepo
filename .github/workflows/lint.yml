@@ -1,0 +1,57 @@
+name: Lint
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  python-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install flake8
+        run: pip install -r web/dev-requirements.txt
+
+      - name: flake8 web/
+        working-directory: web
+        run: flake8 --config=.flake8 .
+
+      - name: flake8 cli/
+        working-directory: cli
+        run: flake8 --config=.flake8 .
+
+  frontend-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.14.0'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type check
+        working-directory: frontend
+        # Non-blocking: the existing codebase predates strict typing and
+        # has a pre-existing backlog of type errors unrelated to any given
+        # change. Surface it in CI output without failing the build until
+        # that backlog is paid down.
+        continue-on-error: true
+        run: npm run type-check
+
+      - name: ESLint
+        working-directory: frontend
+        run: npm run lint
