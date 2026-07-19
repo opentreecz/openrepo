@@ -32,6 +32,8 @@ REQUEST_ENDPOINTS = {
     'package_detail': ('GET', '/api/<repo>/pkg/<package>/'),
     'package_copy': ('POST', '/api/<repo>/pkg/<package>/copy/')
 }
+
+
 def cli_method(func):
     '''Decorator for API functions so that we can autodetect the function and map the args to CLI commands'''
     func.cli_method = True
@@ -46,7 +48,6 @@ class RestInterface:
         if self.base_url.endswith('/'):
             self.base_url = self.base_url[:-1]
 
-
     @cli_method
     def package_copy(self, src_repo_uid, src_package_uid, dst_repo_uid):
         '''
@@ -54,9 +55,9 @@ class RestInterface:
         '''
         return self._request('package_copy',
                              repo=src_repo_uid, package=src_package_uid,
-            postdata={
-            'dest_repo_uid': dst_repo_uid
-        })
+                             postdata={
+                                 'dest_repo_uid': dst_repo_uid
+                             })
 
     @cli_method
     def package_promote(self, src_repo_uid, src_package_uid):
@@ -66,7 +67,9 @@ class RestInterface:
         # Promotion is just a copy to the configured "promote_to" repo
         repo_info = self.repo_details(src_repo_uid)
         if repo_info['promote_to'] is None:
-            raise ORInvalidRequestException("The target repo {src_repo_uid} does not have a configured promotion target")
+            raise ORInvalidRequestException(
+                f"The target repo {src_repo_uid} does not have a configured promotion target"
+            )
 
         return self.package_copy(src_repo_uid, src_package_uid, repo_info['promote_to'])
 
@@ -104,7 +107,7 @@ class RestInterface:
         '''
         Create a new repository
         '''
-        return self._request('repo_create', postdata = {
+        return self._request('repo_create', postdata={
             'repo_uid': repo_uid,
             'repo_type': repo_type,
             'signing_key': signing_key
@@ -154,7 +157,7 @@ class RestInterface:
 
         if query_args is not None:
             url += '?'
-            for k,v in query_args.items():
+            for k, v in query_args.items():
                 url += f'{k}={v}&'
             url = url[:-1]
 
@@ -176,7 +179,6 @@ class RestInterface:
         except requests.exceptions.ConnectionError:
             raise ORConnectionException("Unable to connect to server")
 
-
     def get_cli_functions(self):
         # Make the CLI app a little easier by returning a nicely formatted
         # list of all function names and arguments.  Only includes those that have been
@@ -194,7 +196,7 @@ class RestInterface:
                     methodList.append(str(method_name))
             except Exception:
                 methodList.append(str(method_name))
-        #processFunc = (lambda s: ' '.join(s.split())) or (lambda s: s)
+        # processFunc = (lambda s: ' '.join(s.split())) or (lambda s: s)
         for method in methodList:
             try:
                 method_obj = getattr(self, method)
@@ -206,8 +208,7 @@ class RestInterface:
                                  'doc': method_obj.__doc__
                                  })
 
-            except:
+            except BaseException:
                 logger.exception(f"Failed to infer args for CLI command {method}")
-
 
         return response

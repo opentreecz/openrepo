@@ -27,7 +27,7 @@ class SigningKeyDataService {
   
     create(name: string, email: string) {
 
-      let data = new FormData();
+      const data = new FormData();
       data.append("name", name);
       data.append("email", email);
       

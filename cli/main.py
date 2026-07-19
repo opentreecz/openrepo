@@ -21,6 +21,7 @@ from openrepo_cli.rest_interface import RestInterface
 from openrepo_cli.errors import ORUnauthorizedException, ORNon200ResponseException
 from openrepo_cli.output_formatter import OutputFormatter
 
+
 def main():
     parser = argparse.ArgumentParser(description="OpenRepo Command Line Interface")
 
@@ -28,7 +29,9 @@ def main():
     subparsers.required = True
 
     parser.add_argument("-k", "--key", default=os.getenv('OPENREPO_APIKEY', ''), help='API key')
-    parser.add_argument("-s", "--server", default=os.getenv('OPENREPO_SERVER', 'http://localhost:7376'), help="OpenRepo Server")
+    parser.add_argument(
+        "-s", "--server", default=os.getenv('OPENREPO_SERVER', 'http://localhost:7376'), help="OpenRepo Server"
+    )
 
     parser.add_argument(
         '--debug',
@@ -56,20 +59,20 @@ def main():
         for subarg in func['args'].parameters:
             if subarg not in all_possible_args:
                 all_possible_args[subarg] = True
-            subparser.add_argument( f"--{subarg}", required=True, type=str)
+            subparser.add_argument(f"--{subarg}", required=True, type=str)
 
-
-    ## Upload CLI options
+    # Upload CLI options
     # Upload is handled specially because the arguments (e.g., multiple file paths) is a little different
     subparser_upload = subparsers.add_parser("upload", help="Upload package file to OpenRepo")
 
     subparser_upload.add_argument("-r", "--repo_uid", help="Unique ID of repo to upload to", required=True, type=str)
 
-    subparser_upload.add_argument("-o", "--overwrite", action='store_true', help="Overwrite existing package if it already exists")
+    subparser_upload.add_argument(
+        "-o", "--overwrite", action='store_true', help="Overwrite existing package if it already exists"
+    )
 
     subparser_upload.add_argument("filepath", help="path of file(s) to upload", nargs='+',
                                   type=str)
-
 
     args = parser.parse_args()
 
@@ -111,12 +114,11 @@ def main():
             function = getattr(interface, args.command)
             func_args = vars(args).copy()
             # Delete global args so it won't confuse function
-            for k,v in func_args.copy().items():
+            for k, v in func_args.copy().items():
                 if k not in all_possible_args:
                     del func_args[k]
 
             response_content = function(**func_args)
-
 
         output_format = OutputFormatter(args.json)
         output_format.print(response_content, args.command)
@@ -131,6 +133,7 @@ def main():
         return False
 
     return True
+
 
 if __name__ == '__main__':
     success = main()
