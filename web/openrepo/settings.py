@@ -49,7 +49,12 @@ RPM_VERSION_IGNORE_BUILD_NUM = (
 # See https://docs.djangoproject.com/en/3.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv("OPENREPO_SECRET_KEY") or "django-insecure-s8-h-mhty&_oa)qouzm!_$8s3$yn_u4x$7q$gh7o66cd=3&o_h"
+# Prefer OPENREPO_SECRET_KEY; fall back to DJANGO_SECRET_KEY for upstream compatibility.
+SECRET_KEY = (
+    os.getenv("OPENREPO_SECRET_KEY")
+    or os.getenv("DJANGO_SECRET_KEY")
+    or "django-insecure-s8-h-mhty&_oa)qouzm!_$8s3$yn_u4x$7q$gh7o66cd=3&o_h"
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("OPENREPO_DEBUG", "FALSE").upper() == "TRUE"

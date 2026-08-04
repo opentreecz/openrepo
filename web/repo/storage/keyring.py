@@ -94,13 +94,12 @@ class PGPKeyring:
         # pass
 
     def detach_sign_file(self, pgp_key, output_file, input_file, clear_sign=False):
-        with open(input_file, "r") as inf:
-            self.gpg.sign_file(
-                inf,
-                detach=True,
-                keyid=pgp_key.fingerprint,
-                clearsign=clear_sign,
-                binary=False,
-                output=output_file,
-                extra_args=["-a"],
-            )
+        self.gpg.sign_file(
+            input_file,
+            detach=True,
+            keyid=pgp_key.fingerprint,
+            clearsign=clear_sign,
+            binary=False,
+            output=output_file,
+            extra_args=["-a"],
+        )
