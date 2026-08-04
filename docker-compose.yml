@@ -27,13 +27,14 @@ services:
     volumes:
       - openrepo-data:/var/lib/openrepo
     environment:
-      # - "OPENREPO_CSRF_TRUSTED_ORIGINS=myproxiedname.example.com"   #Multiple domains are space delimited"
+      # - "OPENREPO_CSRF_TRUSTED_ORIGINS=myproxiedname.example.com"   # Multiple domains are space delimited
       - OPENREPO_DB_TYPE=postgresql
       - OPENREPO_PG_DATABASE=openrepo
       - OPENREPO_PG_USERNAME=postgres
       - OPENREPO_PG_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
       - OPENREPO_PG_HOSTNAME=db
-      - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-}
+      # OPENREPO_SECRET_KEY is preferred; DJANGO_SECRET_KEY also accepted for compatibility.
+      - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
     depends_on:
       db:
         condition: service_healthy
@@ -57,7 +58,8 @@ services:
       - OPENREPO_PG_USERNAME=postgres
       - OPENREPO_PG_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
       - OPENREPO_PG_HOSTNAME=db
-      - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-}
+      # OPENREPO_SECRET_KEY is preferred; DJANGO_SECRET_KEY also accepted for compatibility.
+      - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
     depends_on:
       django:
         condition: service_healthy
