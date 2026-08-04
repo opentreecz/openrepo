@@ -48,6 +48,7 @@ from .serializers import (
     UserDetailSerializer,
     UserSerializer,
 )
+from .retention import apply_retention_policy
 from .upload_processor import process_upload
 from .util import MultipleFieldLookupMixin
 
@@ -290,8 +291,7 @@ class CopyViewSet(viewsets.ViewSet):
         package.repo = dst_repo
         package.save()
 
-        if dst_repo.keep_only_latest:
-            Package.objects.filter(repo=dst_repo, package_name=package.package_name).exclude(pk=package.pk).delete()
+        apply_retention_policy(dst_repo, package.package_name, package.architecture)
 
         serializer = PackageDetailSerializer(package)
         return Response(serializer.data)

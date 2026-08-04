@@ -57,8 +57,34 @@ class Repository(models.Model):
     signing_key = models.ForeignKey(PGPSigningKey, blank=True, null=True, on_delete=models.PROTECT)
     promote_to = models.OneToOneField("self", blank=True, null=True, on_delete=models.CASCADE)
 
+    RETENTION_NONE = "none"
+    RETENTION_KEEP_LATEST_N = "keep_latest_n"
+    RETENTION_MAX_AGE_DAYS = "max_age_days"
+    RETENTION_KEEP_LATEST_N_AND_AGE = "keep_latest_n_and_age"
+
+    RETENTION_POLICY_CHOICES = [
+        (RETENTION_NONE, "Keep everything"),
+        (RETENTION_KEEP_LATEST_N, "Keep latest N versions"),
+        (RETENTION_MAX_AGE_DAYS, "Delete packages older than N days"),
+        (RETENTION_KEEP_LATEST_N_AND_AGE, "Keep latest N versions AND delete older than N days"),
+    ]
+
     # When a newer package of the same name is uploaded, delete the older versions
-    keep_only_latest = models.BooleanField(default=False)
+    retention_policy = models.CharField(
+        max_length=32,
+        choices=RETENTION_POLICY_CHOICES,
+        default=RETENTION_NONE,
+        db_index=True,
+    )
+    # Used by keep_latest_n and keep_latest_n_and_age policies
+    retention_keep_count = models.PositiveIntegerField(null=True, blank=True)
+    # Used by max_age_days and keep_latest_n_and_age policies
+    retention_max_age_days = models.PositiveIntegerField(null=True, blank=True)
+
+    # When True (deb repos only), generate per-architecture binary dirs instead of binary-any/.
+    # Packages with Architecture: all are included in every arch index (Debian policy).
+    # Existing repos default to False so clients using binary-any/ are not broken until opted in.
+    multi_arch = models.BooleanField(default=False)
 
     package_count = models.IntegerField(default=0)
     last_updated = models.DateTimeField(auto_now_add=True, blank=True)

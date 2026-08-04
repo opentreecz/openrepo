@@ -168,11 +168,12 @@ class KeepOnlyLatestTestCase(APITestCase):
             repo_uid="latest-dst",
             repo_type="deb",
             signing_key=self.signing_key,
-            keep_only_latest=True,
+            retention_policy=Repository.RETENTION_KEEP_LATEST_N,
+            retention_keep_count=1,
         )
 
     def test_copy_with_keep_only_latest_removes_older(self):
-        """When keep_only_latest=True, copying a newer version deletes older ones"""
+        """retention_policy=keep_latest_n/count=1 on dst removes older versions after copy"""
         # Create an old package in dst
         old_pkg = Package.objects.create(
             repo=self.dst_repo,
@@ -262,7 +263,7 @@ class RepoDetailApiTestCase(APITestCase):
                 "repo_uid": self.repo.repo_uid,
                 "repo_type": self.repo.repo_type,
                 "signing_key": new_key.fingerprint,
-                "keep_only_latest": False,
+                "retention_policy": "none",
             },
             HTTP_AUTHORIZATION=f"Token {self.admin_token}",
             format="json",

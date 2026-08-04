@@ -147,8 +147,9 @@ class ProcessUploadTestCase(TestCase):
 
     @patch("repo.api.upload_processor.create_adapter")
     def test_keep_only_latest_deletes_older_versions(self, mock_create_adapter):
-        """When keep_only_latest is set, uploading a new version removes older ones"""
-        self.repo.keep_only_latest = True
+        """retention_policy=keep_latest_n/count=1 keeps only the newest version after upload"""
+        self.repo.retention_policy = Repository.RETENTION_KEEP_LATEST_N
+        self.repo.retention_keep_count = 1
         self.repo.save()
 
         mock_create_adapter.return_value = self._mock_adapter(version="1.0.0")
