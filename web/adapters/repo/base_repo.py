@@ -68,6 +68,7 @@ class BaseRepoAdapter:
 
         self.repo_uid = repo_db_obj.repo_uid
         self.pgp_key = repo_db_obj.signing_key
+        self.repo_db_obj = repo_db_obj
 
         self.build = None
         self.log_number = 0

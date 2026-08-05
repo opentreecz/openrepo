@@ -1,0 +1,24 @@
+[flake8]
+max-line-length = 120
+exclude =
+    migrations,
+    __pycache__,
+    .git,
+    .venv,
+    venv,
+    build,
+    dist,
+    frontend,
+    deploy,
+    .claude
+per-file-ignores =
+    web/adapters/repo/deb_repo.py: E501
+    web/adapters/repo/rpm_repo.py: E501
+    web/adapters/repo/base_repo.py: E501
+    web/repo/worker/bgworker.py: E501
+    web/openrepo/settings.py: E501
+    web/repo/api/authentication.py: E501
+    web/repo/api/serializers.py: E501
+    web/repo/models.py: E501
+    web/repo/apps.py: F401
+    cli/openrepo_cli/*.py: E501

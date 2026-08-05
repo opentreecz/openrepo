@@ -17,8 +17,10 @@ import threading
 import time
 
 from django.conf import settings
+from django.db import close_old_connections
 
 from adapters.repo import get_repo_adapter
+from repo.api.retention import apply_retention_policy_repo
 from repo.models import Repository
 
 logger = logging.getLogger("openrepo_web")
@@ -26,13 +28,30 @@ logger = logging.getLogger("openrepo_web")
 
 class BackgroundWorker(threading.Thread):
 
+    RETENTION_SWEEP_INTERVAL_SEC = 86400  # 24 hours
+
     def __init__(self, chore_list):
         self.stay_alive = True
         self._chore_list = chore_list
+        self._last_retention_sweep = 0
         threading.Thread.__init__(self)
 
     def stop(self):
         self.stay_alive = False
+
+    def _run_retention_sweep(self):
+        """Apply retention policies across all repos that have a non-none policy."""
+        close_old_connections()
+        repos = Repository.objects.exclude(retention_policy=Repository.RETENTION_NONE)
+        count = repos.count()
+        if count == 0:
+            return
+        logger.info(f"Retention sweep: checking {count} repo(s)")
+        for repo in repos:
+            try:
+                apply_retention_policy_repo(repo)
+            except Exception:
+                logger.exception(f"Retention sweep failed for repo {repo.repo_uid}")
 
     def run(self):
         logger.info(f"Starting bg worker thread {threading.current_thread().ident}")
@@ -41,6 +60,10 @@ class BackgroundWorker(threading.Thread):
         while self.stay_alive:
 
             try:
+                # Nightly retention sweep
+                if time.time() - self._last_retention_sweep >= self.RETENTION_SWEEP_INTERVAL_SEC:
+                    self._run_retention_sweep()
+                    self._last_retention_sweep = time.time()
 
                 next_task_repo_uid = self._chore_list.get_next_task()
 

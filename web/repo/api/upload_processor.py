@@ -8,6 +8,7 @@ from django.db import close_old_connections
 from adapters.file import create_adapter
 from repo.models import Package, UploadTask
 
+from .retention import apply_retention_policy
 from .serializers import PackageDetailSerializer
 from .util import compute_sha512
 
@@ -83,8 +84,7 @@ def process_upload(task_id):
         package.checksum_sha512 = sha512
         package.save()
 
-        if repo.keep_only_latest:
-            Package.objects.filter(repo=repo, package_name=package.package_name).exclude(pk=package.pk).delete()
+        apply_retention_policy(repo, package.package_name, package.architecture)
 
         serializer = PackageDetailSerializer(package)
         task.result_data = serializer.data

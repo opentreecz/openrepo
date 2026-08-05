@@ -60,11 +60,47 @@
                     </v-layout>
                     <v-layout row wrap>
                         <v-col cols="12" class="py-0 my-0">
-                            <v-checkbox
-                                v-model="this.repo_details.keep_only_latest"
+                            <v-select
+                                v-model="this.repo_details.retention_policy"
+                                :items="retention_policy_options"
+                                item-title="display"
+                                item-value="val"
                                 :disabled="form_disabled"
-                                :error-messages="repo_error_response.keep_only_latest"
-                                label="Auto-delete older package versions"
+                                label="Package Retention Policy"
+                            ></v-select>
+                        </v-col>
+                    </v-layout>
+                    <v-layout row wrap v-if="retention_needs_count">
+                        <v-col cols="12" class="py-0 my-0">
+                            <v-text-field
+                                v-model.number="this.repo_details.retention_keep_count"
+                                :disabled="form_disabled"
+                                :error-messages="repo_error_response.retention_keep_count"
+                                label="Number of versions to keep"
+                                type="number"
+                                min="1"
+                            ></v-text-field>
+                        </v-col>
+                    </v-layout>
+                    <v-layout row wrap v-if="retention_needs_age">
+                        <v-col cols="12" class="py-0 my-0">
+                            <v-text-field
+                                v-model.number="this.repo_details.retention_max_age_days"
+                                :disabled="form_disabled"
+                                :error-messages="repo_error_response.retention_max_age_days"
+                                label="Maximum package age (days)"
+                                type="number"
+                                min="1"
+                            ></v-text-field>
+                        </v-col>
+                    </v-layout>
+                    <v-layout row wrap v-if="this.repo_details.repo_type === 'deb'">
+                        <v-col cols="12" class="py-0 my-0">
+                            <v-checkbox
+                                v-model="this.repo_details.multi_arch"
+                                :disabled="form_disabled"
+                                :error-messages="repo_error_response.multi_arch"
+                                label="Multi-architecture support (generate per-arch binary dirs instead of binary-any/)"
                                 ></v-checkbox>
                         </v-col>
                     </v-layout>
@@ -176,11 +212,20 @@ export default {
                 repo_uid: "",
                 signing_key: "",
                 promote_to: "",
-                keep_only_latest: ""
+                retention_policy: "",
+                retention_keep_count: "",
+                retention_max_age_days: "",
+                multi_arch: ""
             },
             repo_general_error_message: '',
             all_repos: [],
             all_pgp_keys: [ ],
+            retention_policy_options: [
+                { display: 'Keep everything', val: 'none' },
+                { display: 'Keep latest N versions', val: 'keep_latest_n' },
+                { display: 'Delete packages older than N days', val: 'max_age_days' },
+                { display: 'Keep latest N versions AND delete older than N days', val: 'keep_latest_n_and_age' },
+            ],
             form_disabled: true,
             breadcrumbs: [
                 {
@@ -200,6 +245,16 @@ export default {
                 },
             ],
         };
+    },
+    computed: {
+        retention_needs_count() {
+            const p = this.repo_details.retention_policy;
+            return p === 'keep_latest_n' || p === 'keep_latest_n_and_age';
+        },
+        retention_needs_age() {
+            const p = this.repo_details.retention_policy;
+            return p === 'max_age_days' || p === 'keep_latest_n_and_age';
+        },
     },
     methods: {
 
