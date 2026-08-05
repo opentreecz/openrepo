@@ -1,174 +1,221 @@
 # openrepo
 
-OpenRepo is a web-based server for managing and hosting repositories containing Debian apt/deb, Redhat rpm, and generic package files.
+OpenRepo is a web-based server for managing and hosting repositories containing Debian apt/deb, Red Hat rpm, and generic package files.
 
 The server supports:
 
-  - RPM, Deb, Generic repository generation and hosting compatible with Debian/Ubuntu apt-get and RedHat yum tools
-  - Package upload, deletion, copying, and promotion (e.g., for easily moving packages through dev, QA, beta, production repos)
+  - RPM, Deb, and Generic repository generation and hosting compatible with Debian/Ubuntu `apt-get` and Red Hat `yum`/`dnf` tools
+  - **Multi-architecture Debian repositories** — generate per-architecture `binary-amd64/`, `binary-arm64/`, etc. instead of the legacy `binary-any/` layout
+  - Package upload, deletion, copying, and promotion (e.g., for moving packages through dev → QA → beta → production repos)
+  - **Package retention policies** — automatically prune old package versions by count, age, or both
   - PGP signing key creation and management
-  - Version management
-  - User read/write access control for each repo
-  - REST API
-  - CLI app to integrate with CI
+  - User read/write access control per repository
+  - REST API and CLI for CI/CD integration
+  - Async drag-and-drop package upload with real-time status tracking
+  - Dark/light theme toggle
 
 
 ![OpenRepo Demo Video](https://github.com/openkilt/openrepo/blob/master/util/doc_images/openrepo-demo.gif?raw=true)
 
 ## Getting Started
 
-The preferred method for running OpenRepo is with Docker using the provided docker-compose.yml configuration file.  This will run the necessary services 
-as well as instantiate a PostgreSQL database.  All persistent files (i.e., the database, cache data, PGP keys, and the package files) are stored in a relative folder named 
-openrepo-data.
+The preferred method for running OpenRepo is with Docker using the provided `docker-compose.yml`.  This starts all required services and a PostgreSQL database.  All persistent data (database, cache, PGP keys, and package files) is stored in a named Docker volume.
 
-First ensure that you have installed Docker and the [Docker Compose plugin](https://docker-docs.netlify.app/compose/install/)
+**Prerequisites:** [Docker](https://docs.docker.com/engine/install/) and the [Docker Compose plugin](https://docker-docs.netlify.app/compose/install/).
 
+```bash
+wget https://raw.githubusercontent.com/opentreecz/openrepo/main/docker-compose.yml
+docker compose up -d
+```
 
-To start the server:
+Navigate to http://localhost:7376
 
-    wget https://raw.githubusercontent.com/openkilt/openrepo/master/docker-compose.yml
-    docker compose up -d
-
-You can now navigate to the server on http://localhost:7376
-
-The default credentials are:
+Default credentials:
 
     username: admin
     password: admin
 
-If desired, it is possible to point to an alternative PostgreSQL server by updating the "OPENREPO_PG" environment variables in the docker-compose file.
+> **Security:** Change the default admin password immediately after first login.
+
+### Environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `OPENREPO_SECRET_KEY` | *(insecure built-in)* | Django secret key — set this in production. `DJANGO_SECRET_KEY` is also accepted for compatibility. |
+| `OPENREPO_PG_PASSWORD` | `postgres` | PostgreSQL password |
+| `OPENREPO_PG_HOSTNAME` | `db` | PostgreSQL host |
+| `OPENREPO_PG_DATABASE` | `openrepo` | PostgreSQL database name |
+| `OPENREPO_PG_USERNAME` | `postgres` | PostgreSQL username |
+| `OPENREPO_VAR_DIR` | `/var/lib/openrepo/` | Base directory for all persistent data |
+| `OPENREPO_DEBUG` | `FALSE` | Enable Django debug mode |
+| `OPENREPO_LOGLEVEL` | `INFO` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `OPENREPO_DOMAIN` | `localhost:8080` | Public domain name (used in repo instructions) |
+| `OPENREPO_CSRF_TRUSTED_ORIGINS` | *(none)* | Space-separated list of trusted CSRF origins for reverse proxies |
+
+Copy `.env.example` to `.env` and fill in values before starting.
 
 
 ## CI Integration
 
-A common requirement is to automatically upload package files produced via Continuous Integration.  Please see the [OpenRepo Command-Line-Interface documentation](cli/) for more details.
+A common requirement is to automatically upload packages produced by Continuous Integration.  See the [CLI documentation](cli/) for details.
 
-The CLI program (or REST API) can be used to push new packages to a repo, and can also be used to promote or copy packages to other repos.
+The CLI (or REST API) can push packages to a repo, promote or copy packages between repos, and query repo/package status.
+
+
+## Features
+
+### Multi-architecture Debian repositories
+
+By default, Debian repos use `binary-any/` (compatible with all packages).  Enable **multi-arch** mode per repo in Repo Settings to generate proper per-architecture directories:
+
+- Uploaded packages are indexed under their actual architecture (e.g. `binary-amd64/`, `binary-arm64/`)
+- Packages with `Architecture: all` appear in every arch index per Debian policy
+- The generated setup instructions automatically reflect all detected architectures: `deb [arch=amd64,arm64 signed-by=...] ...`
+- Existing repos default to `binary-any/` — opt in per-repo to avoid breaking existing clients
+
+### Package retention policies
+
+Configure automatic cleanup of old package versions per repository in Repo Settings:
+
+| Policy | Behaviour |
+|---|---|
+| **Keep everything** | No automatic deletion (default) |
+| **Keep latest N versions** | Keep the N most recent versions per package name + architecture |
+| **Delete packages older than N days** | Remove packages uploaded more than N days ago |
+| **Keep latest N versions AND delete older than N days** | Apply both rules — whichever removes more |
+
+Retention is enforced:
+1. Immediately after each upload or package copy
+2. During the nightly background sweep (every 24 hours)
+
+Packages that are referenced by another repository are never deleted regardless of policy.
+
+### Package promotion
+
+Each repository can be configured with a **Promote destination** repo.  Clicking "Promote" copies selected packages to that destination, making it easy to move packages through a pipeline (e.g. `dev → staging → production`).
+
+The frontend highlights which packages in a repo are already present in the promotion target.
+
+### PGP signing
+
+Repositories can be assigned a PGP signing key.  On every rebuild:
+- **Debian:** generates `Release.gpg` (detach-signed) and `InRelease` (clearsigned)
+- **RPM:** signs `repodata/repomd.xml`
+- The public key is exported to `public.gpg` inside the repo for client configuration
+
+Signing keys are generated as 4096-bit RSA keys directly on the server.  Keys can also be imported from existing PEM files via the `import_pgp_private_key` management command.
+
 
 ## Users and Permissions
 
 There are two levels of users:
 
-  1. **Super User** - Has read/write access to all repositories as well as administrative access to add/remove users, keys, and permissions
-  2. **Regular User** - Has read access to all repositories.  Write access must be granted explicitly for each repository
+  1. **Super User** — Full read/write access to all repositories plus admin access to add/remove users, keys, and permissions
+  2. **Regular User** — Read access to all repositories.  Write access must be granted explicitly per repository
 
-Two add a new user:
-  1. As the super user, click on "System Admin" from the menu in the top-right
-  2. Click on the "Add" button next to the Users link
-  3. Add a username and password and click "Save"
-    - An API key is automatically created.  This can be deleted to disallow API access
-  4. To enable write access, click on the "Repositories" link, then click the repository where you wish this user to have write access.  Add the user to this list and save.
+To add a new user:
+  1. Log in as a super user and click **System Admin** in the top-right menu
+  2. Click **Add** next to the Users link
+  3. Set a username and password and click **Save** (an API token is created automatically)
+  4. To grant write access, click **Repositories**, select a repo, add the user to the write access list, and save
 
 
 ## REST API
 
+### Repo actions
 
-### Repo actions:
+    GET    /api/repos/                              # List all repos
+    POST   /api/repos/                              # Create a repo
+    GET    /api/<repo_uid>/                         # Repo details (includes setup instructions)
+    PUT    /api/<repo_uid>/                         # Update repo settings
+    DELETE /api/<repo_uid>/                         # Delete a repo
 
-Repo UID is created when a new repo is created.  
+### Package actions
 
-    # list names of repos along with IDs
-    GET /api/repos/
-    Example: curl -X GET http://<your-openrepo-instance>:7376/api/repos/ -H 'Authorization: Token <your-user-token>' 
-    
-    # Show details for a particular repo
-    GET /api/<repo>/
+    GET    /api/<repo_uid>/packages/                # List packages (searchable, sortable)
+    POST   /api/<repo_uid>/upload/                  # Upload a package (async, returns task_id)
+    GET    /api/upload-status/<task_id>/            # Poll upload task status
+    GET    /api/<repo_uid>/pkg/<package_uid>/       # Package details
+    DELETE /api/<repo_uid>/pkg/<package_uid>/       # Delete a package
+    POST   /api/<repo_uid>/pkg/<package_uid>/copy/  # Copy package to another repo
 
-    # Create a new repo
-    POST /api/repos/
-    Example: curl -X POST http://<your-openrepo-instance>:7376/api/repos/ -H 'Authorization: Token <your-user-token>' -F "repo_uid=<repo-name>" -F "repo_type=<deb|rpm|files>" -F "signing_key=<FINGERPRINT_OF_SIGNINGKEY"
-    You need to create a SigningKey otherwise you can not create
+### Signing key actions
 
-    # Delete a repo
-    DELETE /api/<repo>/
+    GET    /api/signingkeys/                        # List all signing keys
+    POST   /api/signingkeys/                        # Generate a new signing key
+    DELETE /api/signingkeys/<fingerprint>/          # Delete a signing key
+    GET    /api/signingkeys/<fingerprint>/download/ # Download public key as .asc
 
-### Package actions:
+### Build / log actions
 
-Package UID is created when a new package is uploaded or copied
+    GET    /api/builds/                             # List repo builds (filterable)
+    GET    /api/buildlogs/                          # List build log lines (filterable)
 
-    # List packages for a particular repo
-    GET /api/<repo>/packages/
+### Auth
 
-    # Upload a package to a repo
-    POST /api/<repo>/upload/
-    Example: curl -X POST http://<your-openrepo-instance>:7376/api/<target-repository>/upload/ -H 'Authorization: Token <your-user-token>' -F "package_file=@/path/to/your.deb"
-    
-    # Delete a package
-    DELETE /api/<repo>/pkg/<package>/
-    Example: curl -X DELETE http://<your-openrepo-instance>:7376/api/<target-repository>/pkg/<package_uid> -H 'Authorization: Token <your-user-token>' 
-    
-    # Show details for a particular package
-    GET /api/<repo>/pkg/<package>/
+    GET    /api/whoami                              # Current user info + API token
 
-    # Copy a package to another repo
-    POST /api/<repo>/pkg/<package>/copy/
+All endpoints require a token in the `Authorization` header:
 
-### Signing Key actions:
-
-The signing key ID is the fingerprint of the PGP key and is created when the key is uploaded or created
-
-    # List all signing keys
-    GET /api/signingkeys/
-
-    # Create a new signing key
-    POST /api/signingkeys/
-
-    # Delete a signing key
-    DELETE /api/signingkeys/<signingkey>/
+    curl -H 'Authorization: Token <your-token>' http://localhost:7376/api/repos/
 
 
-# Development
+## Development
 
+### Architecture
 
-## Architecture
+OpenRepo consists of four processes:
 
-OpenRepo consists of four running processes:
+| Process | Role |
+|---|---|
+| **Nginx** | Serves static files, Vue frontend, and repo files; proxies `/api/` and `/admin/` to Django |
+| **Django app server** | Hosts the REST API and admin interface |
+| **Django worker** | Background process that regenerates repo metadata when packages change; runs nightly retention sweeps |
+| **PostgreSQL** | Primary data store (SQLite supported for development) |
 
-### Nginx web server
+### Dev environment setup
 
-The web server hosts the static file content.  This includes the "frontend" generated content (Vue/Vuetify) as well as the images and repo files.
+Add `web/openrepo/settings_local.py`:
 
-The web server also serves as a proxy for the Django endpoints.  These are primarily the REST API and the admin interface.
+```python
+import os
 
-The Nginx web port is the only port that should be exposed to network traffic.
+os.environ["OPENREPO_VAR_DIR"] = "/var/tmp/openrepo/"
+os.environ["OPENREPO_DEBUG"] = "TRUE"
+os.environ["OPENREPO_DB_TYPE"] = "sqlite"
+os.environ["OPENREPO_LOGLEVEL"] = "DEBUG"
+```
 
-### The Django app server
+Run each process in a separate terminal:
 
-The app server hosts the REST API which is the primary way for the frontend and CLI to interact with the application.  There are also a few static pages (e.g., the admin interface, password change forms, etc) that are proxied through to Django.
+```bash
+# Tab 1 — Django dev server
+cd web && ./manage.py runserver
 
-### The Django worker
+# Tab 2 — background worker
+cd web && ./manage.py runworker
 
-The worker runs as a background process and communicates exclusively with the database server.  The Django worker is responsible for generating metadata when the repos are updated (i.e., packages are uploaded or deleted).  This process uses OS tools to create the repos and symlinks the files to their appropriate locations.  Some repo generating tools may make use of a cache to store things such as hash information to speed up subsequent repo updates.
+# Tab 3 — Vue dev server (hot reload)
+cd frontend && npm run dev
 
-### The Database
+# Tab 4 — Nginx dev proxy
+nginx -c /path/to/openrepo/deploy/nginx/nginx.conf.dev
+```
 
-By default OpenRepo uses PostgreSQL.  Using other databases are possible (e.g., SQLite to simplify development), however PostgreSQL is recommended for production.
+Navigate to http://localhost:5173/ — both servers support live reload on code changes.
 
+### Running tests
 
+```bash
+OPENREPO_VAR_DIR=/tmp/openrepo python3 web/manage.py test repo.tests
+```
 
-## Dev Env Setup
+### Linting
 
-Running the above components individually is the best way to test modifications to the source code.
+```bash
+# Python (from repo root)
+flake8 .
 
-The first step is to add a file named web/openrepo/settings_local.py and apply any environment variable overrides for development.  
-
-For example, the following settings_local.py file will configure your environment to use developer-friendly settings.
-
-
-    import os
-
-    os.environ["OPENREPO_VAR_DIR"] = "/var/tmp/openrepo/"
-    os.environ["OPENREPO_DEBUG"] = "TRUE"
-    os.environ["OPENREPO_DB_TYPE"] = "sqlite"
-    os.environ["OPENREPO_LOGLEVEL"] = "DEBUG"
-
-
-Next, open four separate tabs and run the following commands:
-
-    Tab 1: cd web; ./manage.py runserver
-    Tab 2: cd web; ./manage.py runworker
-    Tab 3: cd frontend; npm run dev
-    Tab 4: nginx -c /storage/projects/openrepo/deploy/nginx/nginx.conf.dev
-
-
-Next, navigate to http://localhost:5173/ to see your code updates.  Both the Vue.js dev server and the Django dev server support live updates on code changes.  
+# Frontend
+cd frontend && npm run lint
+```

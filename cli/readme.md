@@ -1,86 +1,136 @@
 # openrepo_cli
 
-The OpenRepo Command Line Interface (CLI) app provides an easy way to integrate OpenRepo with other applications such as Continuous Integration.  For example,
-you could use the CLI app to automatically upload a package to a repo when a build completes, or create a new repo when a git repository is created.
+The OpenRepo Command Line Interface (CLI) provides an easy way to integrate OpenRepo with CI/CD pipelines — upload packages when a build finishes, promote packages through environments, query repo state, and more.
 
-## Usage
+## Installation
 
- - First download the OpenRepo CLI program from the Releases
+Download the standalone binary from the [Releases page](https://github.com/opentreecz/openrepo/releases):
 
-        sudo wget https://github.com/openkilt/openrepo/releases/download/v1.0.0/openrepo_cli_$(uname -m) -O /usr/local/bin/openrepo && sudo chmod +x /usr/local/bin/openrepo
+```bash
+sudo wget https://github.com/opentreecz/openrepo/releases/download/v1.0.0/openrepo_cli_$(uname -m) \
+  -O /usr/local/bin/openrepo && sudo chmod +x /usr/local/bin/openrepo
+```
 
- - Login to your OpenRepo server and navigate to the "User Info" page (/cfg/userinfo/)
+Or run directly from source:
 
- - Copy the CLI instructions which include your API key and server location.  For example:
+```bash
+cd cli
+pip install -r requirements.txt
+PYTHONPATH=. python main.py --help
+```
 
-        export OPENREPO_SERVER=http://repo.mydomain.com
-        export OPENREPO_APIKEY=abcdef1234567890abcdef1234567890abcdef12
-        openrepo list_repos
+## Quick start
 
-- The output should look similar to the following:
+1. Log in to your OpenRepo server and go to **User Info** (`/cfg/userinfo/`)
+2. Copy the CLI snippet — it sets your API key and server URL:
 
-        user@computer:/home/user/openrepo/cli$ openrepo list_repos
+```bash
+export OPENREPO_SERVER=http://repo.mydomain.com
+export OPENREPO_APIKEY=abcdef1234567890abcdef1234567890abcdef12
+openrepo list_repos
+```
 
-        ┌──────────────────┬───────────┬───────────────┬─────────────────────────────┐
-        │     repo_uid     │ repo_type │ package_count │         last_updated        │
-        ├──────────────────┼───────────┼───────────────┼─────────────────────────────┤
-        │ acmewidgets-dev  │    deb    │       7       │ 2022-12-01T02:38:48.595892Z │
-        │ acmewidgets-prod │    deb    │       6       │ 2022-12-01T02:35:03.617695Z │
-        │     qatools      │   files   │       78      │ 2022-12-01T03:43:56.944487Z │
-        │   redhat-dist    │    rpm    │       5       │ 2022-12-01T03:44:10.276156Z │
-        └──────────────────┴───────────┴───────────────┴─────────────────────────────┘
+Output:
 
-- Use the --help command to show repository options:
+```
+┌──────────────────┬───────────┬───────────────┬─────────────────────────────┐
+│     repo_uid     │ repo_type │ package_count │         last_updated        │
+├──────────────────┼───────────┼───────────────┼─────────────────────────────┤
+│ acmewidgets-dev  │    deb    │       7       │ 2022-12-01T02:38:48.595892Z │
+│ acmewidgets-prod │    deb    │       6       │ 2022-12-01T02:35:03.617695Z │
+│     qatools      │   files   │       78      │ 2022-12-01T03:43:56.944487Z │
+│   redhat-dist    │    rpm    │       5       │ 2022-12-01T03:44:10.676156Z │
+└──────────────────┴───────────┴───────────────┴─────────────────────────────┘
+```
 
+## Global options
 
-        user@computer:/home/user/openrepo/cli$ openrepo --help
-        usage: openrepo [-h] [-k KEY] [-s SERVER] [--debug] [--json]
-                        {list_packages,list_repos,list_signingkeys,package_copy,package_delete,package_detail,package_promote,repo_create,repo_delete,repo_details,upload} ...
+| Option | Env variable | Default | Description |
+|---|---|---|---|
+| `-k, --key` | `OPENREPO_APIKEY` | *(required)* | API token |
+| `-s, --server` | `OPENREPO_SERVER` | `http://localhost:7376` | Server URL |
+| `--debug` | — | off | Print full request/response detail |
+| `--json` | — | off | Output as machine-readable JSON |
 
-        OpenRepo Command Line Interface
+## Commands
 
-        positional arguments:
-          {list_packages,list_repos,list_signingkeys,package_copy,package_delete,package_detail,package_promote,repo_create,repo_delete,repo_details,upload}
-                                Available OpenRepo Operations
-            list_packages       List packages in a repository
-            list_repos          List all repositories
-            list_signingkeys    List all signing keys
-            package_copy        Copy a package from one repository to another
-            package_delete      Delete a repository
-            package_detail      Show detailed information about a package
-            package_promote     Promote a package to the repo configured as "promote_to"
-            repo_create         Create a new repository
-            repo_delete         Delete new repository
-            repo_details        Show detailed information about a particular repo
-            upload              Upload package file to OpenRepo
+### Repository commands
 
-        options:
-          -h, --help            show this help message and exit
-          -k KEY, --key KEY     API key
-          -s SERVER, --server SERVER
-                                OpenRepo Server
-          --debug               Print debug info
-          --json                Print output to JSON
+```bash
+# List all repositories
+openrepo list_repos
 
+# Show full details for a repo (includes client setup instructions)
+openrepo repo_details --repo_uid <repo_uid>
 
-        user@computer:/home/user/openrepo/cli$ openrepo package_copy --help
-        usage: openrepo package_copy [-h] --src_repo_uid SRC_REPO_UID --src_package_uid SRC_PACKAGE_UID --dst_repo_uid DST_REPO_UID
+# Create a new repository
+openrepo repo_create --repo_uid <repo_uid> --repo_type <deb|rpm|files> --signing_key <fingerprint>
 
-        options:
-          -h, --help            show this help message and exit
-          --src_repo_uid SRC_REPO_UID
-          --src_package_uid SRC_PACKAGE_UID
-          --dst_repo_uid DST_REPO_UID
+# Delete a repository
+openrepo repo_delete --repo_uid <repo_uid>
+```
 
+### Package commands
+
+```bash
+# List packages in a repository
+openrepo list_packages --repo_uid <repo_uid>
+
+# Show details for a single package
+openrepo package_detail --repo_uid <repo_uid> --package_uid <package_uid>
+
+# Upload one or more package files (async — waits for processing)
+openrepo upload --repo_uid <repo_uid> /path/to/file.deb
+openrepo upload --repo_uid <repo_uid> /path/to/*.rpm
+openrepo upload --repo_uid <repo_uid> --overwrite /path/to/file.deb
+
+# Copy a package to another repository
+openrepo package_copy --src_repo_uid <src> --src_package_uid <uid> --dst_repo_uid <dst>
+
+# Promote a package to the repo configured as "promote_to"
+openrepo package_promote --src_repo_uid <repo_uid> --src_package_uid <package_uid>
+
+# Delete a package
+openrepo package_delete --repo_uid <repo_uid> --package_uid <package_uid>
+```
+
+### Signing key commands
+
+```bash
+# List all signing keys
+openrepo list_signingkeys
+```
+
+## CI/CD examples
+
+### Upload on every build (GitHub Actions)
+
+```yaml
+- name: Upload package to OpenRepo
+  env:
+    OPENREPO_SERVER: ${{ secrets.OPENREPO_SERVER }}
+    OPENREPO_APIKEY: ${{ secrets.OPENREPO_APIKEY }}
+  run: openrepo upload --repo_uid myapp-dev dist/myapp_1.0_amd64.deb
+```
+
+### Promote from dev to staging after tests pass
+
+```bash
+# Get the package uid of the version just uploaded
+PKG_UID=$(openrepo list_packages --repo_uid myapp-dev --json | jq -r '.results[0].package_uid')
+
+# Promote it
+openrepo package_promote --src_repo_uid myapp-dev --src_package_uid "$PKG_UID"
+```
+
+### Overwrite a package (re-upload same version)
+
+```bash
+openrepo upload --repo_uid myapp-dev --overwrite dist/myapp_1.0_amd64.deb
+```
 
 ## Architecture
 
-The OpenRepo CLI uses the OpenRepo REST API to communicate with the server.  The API key is sent in the Authorization header.  
+The CLI communicates exclusively via the OpenRepo REST API, sending the API token in the `Authorization: Token <key>` header.  All commands map 1:1 to REST endpoints.
 
-The CLI program is written in Python.  For distribution, we create a standalone x86-64 binary using pyinstaller.
-
-The server URL and API key can be provided either as CLI arguments or environment variables.  The CLI arg will take priority if provided.
-
-The output can be either human-readable tables (default) or machine-readable JSON data.  To send JSON data, use the "--json" argument
-
-the --debug argument logs detailed information about the request/response from the server.
+The CLI is written in Python and can be distributed as a standalone binary via `pyinstaller`.  Output is either human-readable tables (default) or JSON (`--json`).
