@@ -46,11 +46,14 @@ Default credentials:
 | `OPENREPO_PG_HOSTNAME` | `db` | PostgreSQL host |
 | `OPENREPO_PG_DATABASE` | `openrepo` | PostgreSQL database name |
 | `OPENREPO_PG_USERNAME` | `postgres` | PostgreSQL username |
+| `OPENREPO_DB_TYPE` | `sqlite` | Database backend: `sqlite` or `postgresql` |
 | `OPENREPO_VAR_DIR` | `/var/lib/openrepo/` | Base directory for all persistent data |
 | `OPENREPO_DEBUG` | `FALSE` | Enable Django debug mode |
 | `OPENREPO_LOGLEVEL` | `INFO` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `OPENREPO_DOMAIN` | `localhost:8080` | Public domain name (used in repo instructions) |
+| `OPENREPO_SECURE_HOSTS` | `FALSE` | Set `TRUE` to restrict `ALLOWED_HOSTS` to `localhost` and `OPENREPO_DOMAIN` only |
 | `OPENREPO_CSRF_TRUSTED_ORIGINS` | *(none)* | Space-separated list of trusted CSRF origins for reverse proxies |
+| `RPM_VERSION_IGNORE_BUILD_NUM` | `false` | Set `true` to use only the RPM `version` field and ignore the `release` (build number) suffix |
 
 Copy `.env.example` to `.env` and fill in values before starting.
 
@@ -90,6 +93,8 @@ Retention is enforced:
 
 Packages that are referenced by another repository are never deleted regardless of policy.
 
+> **Upgrading from an older version:** The `keep_only_latest` boolean flag has been replaced by retention policies. Existing repos that had `keep_only_latest=True` are automatically migrated to `retention_policy=keep_latest_n` with `retention_keep_count=1` — no manual action required.
+
 ### Package promotion
 
 Each repository can be configured with a **Promote destination** repo.  Clicking "Promote" copies selected packages to that destination, making it easy to move packages through a pipeline (e.g. `dev → staging → production`).
@@ -127,7 +132,8 @@ To add a new user:
     GET    /api/repos/                              # List all repos
     POST   /api/repos/                              # Create a repo
     GET    /api/<repo_uid>/                         # Repo details (includes setup instructions)
-    PUT    /api/<repo_uid>/                         # Update repo settings
+    PUT    /api/<repo_uid>/                         # Update repo settings (full update)
+    PATCH  /api/<repo_uid>/                         # Partial update (e.g. signing key only)
     DELETE /api/<repo_uid>/                         # Delete a repo
 
 ### Package actions
