@@ -1,0 +1,16 @@
+title: OpenRepo
+description: Web-based package repository manager for Debian APT, Red Hat RPM, and generic files
+theme: just-the-docs
+url: "https://opentreecz.github.io"
+baseurl: "/openrepo"
+
+nav_sort: case_insensitive
+color_scheme: light
+
+aux_links:
+  "GitHub":
+    - "https://github.com/opentreecz/openrepo"
+
+aux_links_new_tab: true
+
+footer_content: "OpenRepo — AGPL-3.0 license"

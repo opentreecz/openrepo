@@ -1,5 +1,7 @@
 # openrepo
 
+**Documentation:** [https://opentreecz.github.io/openrepo/](https://opentreecz.github.io/openrepo/)
+
 OpenRepo is a web-based server for managing and hosting repositories containing Debian apt/deb, Red Hat rpm, and generic package files.
 
 The server supports:
@@ -246,6 +248,7 @@ Three GitHub Actions workflows run on every push:
 | **CI** (Django + CLI tests) | `.github/workflows/main.yml` | push, pull_request, weekly schedule |
 | **Lint** (flake8 + ESLint) | `.github/workflows/lint.yml` | push, pull_request |
 | **Docker build & push** | `.github/workflows/docker-build.yml` | push to `main`, version tags, weekly schedule |
+| **GitHub Pages** | `.github/workflows/pages.yml` | push to `main` |
 
 The Docker workflow pushes to `ghcr.io/opentreecz/openrepo:latest` and also tags by git SHA and semver.  The weekly scheduled runs rebuild against the latest base images so security patches land even without a code change.
 
