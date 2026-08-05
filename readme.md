@@ -219,3 +219,37 @@ flake8 .
 # Frontend
 cd frontend && npm run lint
 ```
+
+### Management commands
+
+| Command | Description |
+|---|---|
+| `./manage.py runworker` | Start the background worker (repo rebuilds + nightly retention sweep) |
+| `./manage.py startup_checks` | Run at app startup — imports all DB keys into the local GPG keyring |
+| `./manage.py refresh_keychain` | Re-import all PGP keys from the database into the local GPG keyring (useful after keyring is lost or moved) |
+| `./manage.py import_pgp_private_key <path> [--passphrase <phrase>]` | Import an existing PGP private key from a PEM file into the database and keyring |
+| `./manage.py migrate` | Apply database migrations |
+| `./manage.py createsuperuser` | Create a new admin user |
+
+### CI/CD workflows
+
+Three GitHub Actions workflows run on every push:
+
+| Workflow | File | Triggers |
+|---|---|---|
+| **CI** (Django + CLI tests) | `.github/workflows/main.yml` | push, pull_request, weekly schedule |
+| **Lint** (flake8 + ESLint) | `.github/workflows/lint.yml` | push, pull_request |
+| **Docker build & push** | `.github/workflows/docker-build.yml` | push to `main`, version tags, weekly schedule |
+
+The Docker workflow pushes to `ghcr.io/opentreecz/openrepo:latest` and also tags by git SHA and semver.  The weekly scheduled runs rebuild against the latest base images so security patches land even without a code change.
+
+### Code coverage
+
+See [web/CODE_COVERAGE.md](web/CODE_COVERAGE.md) for full instructions on generating and interpreting coverage reports.
+
+```bash
+cd web
+coverage run manage.py test repo.tests
+coverage report
+coverage html -d htmlcov/
+```
