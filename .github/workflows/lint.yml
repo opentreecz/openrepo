@@ -7,7 +7,7 @@ on:
 
 jobs:
   python-lint:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
 
@@ -28,7 +28,7 @@ jobs:
         run: flake8 --config=.flake8 .
 
   frontend-lint:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v7
 

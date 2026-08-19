@@ -11,7 +11,7 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     env:
       OPENREPO_VAR_DIR: /tmp/openrepo/
@@ -60,7 +60,7 @@ jobs:
           path: web/coverage.xml
 
   cli-tests:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v7
