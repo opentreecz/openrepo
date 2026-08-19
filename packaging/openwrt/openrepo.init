@@ -1,0 +1,70 @@
+#!/bin/sh /etc/rc.common
+# OpenRepo procd init script for OpenWrt
+# Manages the web server (gunicorn) and background worker processes.
+
+START=95
+STOP=10
+USE_PROCD=1
+
+PROG_WEB=/opt/openrepo/venv/bin/gunicorn
+PROG_WORKER=/opt/openrepo/venv/bin/python
+WORKDIR=/opt/openrepo
+
+start_service() {
+    config_load openrepo
+    local enabled port workers db_type var_dir loglevel use_python_tools
+    config_get_bool enabled main enabled 1
+    config_get port main port 8000
+    config_get workers main workers 2
+    config_get db_type main db_type sqlite
+    config_get var_dir main var_dir /opt/openrepo/data
+    config_get loglevel main loglevel INFO
+    config_get_bool use_python_tools main use_python_tools 1
+
+    [ "$enabled" -eq 0 ] && return 0
+
+    # Ensure data directories exist
+    mkdir -p "$var_dir/storage" "$var_dir/repos" "$var_dir/keyring"
+
+    # Start gunicorn web server
+    procd_open_instance web
+    procd_set_param command $PROG_WEB openrepo.wsgi:application \
+        --bind "127.0.0.1:$port" \
+        --workers "$workers" \
+        --timeout 120 \
+        --chdir "$WORKDIR"
+    procd_set_param env \
+        OPENREPO_USE_PYTHON_TOOLS="$use_python_tools" \
+        OPENREPO_VAR_DIR="$var_dir/" \
+        OPENREPO_DB_TYPE="$db_type" \
+        OPENREPO_LOGLEVEL="$loglevel"
+    procd_set_param respawn 3600 5 5
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_set_param pidfile /var/run/openrepo-web.pid
+    procd_close_instance
+
+    # Start background worker (repo regeneration + retention)
+    procd_open_instance worker
+    procd_set_param command $PROG_WORKER manage.py runworker
+    procd_set_param env \
+        OPENREPO_USE_PYTHON_TOOLS="$use_python_tools" \
+        OPENREPO_VAR_DIR="$var_dir/" \
+        OPENREPO_DB_TYPE="$db_type" \
+        OPENREPO_LOGLEVEL="$loglevel"
+    procd_set_param respawn 3600 5 5
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_set_param pidfile /var/run/openrepo-worker.pid
+    procd_append_param command --chdir "$WORKDIR"
+    procd_close_instance
+}
+
+stop_service() {
+    :
+}
+
+reload_service() {
+    stop
+    start
+}

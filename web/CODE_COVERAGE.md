@@ -2,6 +2,8 @@
   <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="150"/>
 </p>
 
+> **Full documentation:** [opentreecz.github.io/openrepo/development](https://opentreecz.github.io/openrepo/development)
+
 # Code Coverage Report — OpenRepo
 
 > Generated on: 2026-06-17  

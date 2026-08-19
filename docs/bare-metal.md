@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Bare-Metal Deployment
-nav_order: 7
+nav_order: 8
 ---
 
 <p align="center">
@@ -318,6 +318,87 @@ sudo -u openrepo bash -c '
 # Restart services
 sudo systemctl start openrepo-web openrepo-worker
 ```
+
+---
+
+## Alpine Linux
+
+Alpine Linux uses `apk` for package management. OpenRepo doesn't have a native `.apk` package yet, but can be installed manually:
+
+```bash
+# Install system dependencies
+apk add python3 py3-pip py3-virtualenv nginx postgresql createrepo_c gnupg
+
+# Create user and directories
+adduser -D -h /opt/openrepo openrepo
+mkdir -p /var/lib/openrepo/{storage,repos,keyring}
+chown -R openrepo:openrepo /var/lib/openrepo
+
+# Install application
+su -s /bin/sh openrepo -c '
+    cd /opt/openrepo
+    python3 -m venv venv
+    venv/bin/pip install -r requirements.txt
+'
+
+# Use OpenRC init scripts from packaging/openrc/
+cp packaging/openrc/openrepo-web /etc/init.d/
+cp packaging/openrc/openrepo-worker /etc/init.d/
+chmod +x /etc/init.d/openrepo-web /etc/init.d/openrepo-worker
+rc-update add openrepo-web default
+rc-update add openrepo-worker default
+```
+
+---
+
+## OpenWrt
+
+OpenRepo can run as a full server on OpenWrt devices with sufficient resources.
+
+{: .warning }
+**Minimum requirements:** 256MB RAM, 128MB flash storage. Most consumer routers do NOT meet these requirements. This is suitable for x86_64 OpenWrt VMs, high-end ARM boards (RPi 4, NanoPi R4S), or purpose-built appliances.
+
+OpenWrt uses **pure-Python fallback tools** for repository metadata generation instead of `apt-ftparchive` and `createrepo_c` (which are not available on OpenWrt). This is controlled by the `OPENREPO_USE_PYTHON_TOOLS=1` environment variable and has **no impact** on other deployment methods.
+
+### Installation
+
+```bash
+opkg update
+opkg install openrepo-server
+```
+
+### Configuration
+
+Edit `/etc/config/openrepo`:
+
+```
+config openrepo 'main'
+    option enabled '1'
+    option port '8000'
+    option workers '2'
+    option db_type 'sqlite'
+    option var_dir '/opt/openrepo/data'
+    option use_python_tools '1'
+    option loglevel 'INFO'
+```
+
+### Service management (procd)
+
+```bash
+/etc/init.d/openrepo enable
+/etc/init.d/openrepo start
+/etc/init.d/openrepo stop
+/etc/init.d/openrepo restart
+```
+
+### Limitations on OpenWrt
+
+- Uses SQLite instead of PostgreSQL (lower memory overhead)
+- Uses pure-Python metadata generators (slightly slower for large repos)
+- No `apt-ftparchive` or `createrepo_c` — all repo types work via Python fallback
+- Frontend must be pre-built (no Node.js on OpenWrt)
+
+For full details, see the dedicated [OpenWrt Deployment](openwrt) page.
 
 ---
 

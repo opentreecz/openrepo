@@ -325,15 +325,29 @@ sudo systemctl enable --now openrepo-web openrepo-worker
 
 See [docs/bare-metal.md](docs/bare-metal.md) for detailed instructions on deploying without Docker, including systemd, OpenRC, and SysVinit service configurations.
 
+### OpenWrt
+
+OpenRepo can run as a full server on OpenWrt devices (256MB+ RAM, 128MB+ flash). See [docs/openwrt.md](docs/openwrt.md) for detailed instructions.
+
+```bash
+opkg install openrepo-server
+/etc/init.d/openrepo enable
+/etc/init.d/openrepo start
+```
+
 ## Supported Architectures
 
 OpenRepo handles multiple CPU architectures in a single repository:
 
 | Package Type | Supported Architectures | How it works |
 |---|---|---|
-| **Debian (.deb)** | amd64, arm64, armhf, armel, i386, riscv64, s390x, mips64el, ppc64el, all | Per-arch `binary-<arch>/` directories with `Architecture: all` in every index |
-| **RPM (.rpm)** | x86_64, aarch64, armv7hl, i686, ppc64le, s390x, riscv64, noarch | Single flat repo; `dnf`/`yum` filters by client architecture |
+| **Debian (.deb)** | amd64, arm64, armhf, armel, i386, loongarch64, riscv64, s390x, mips64el, ppc64el, all | Per-arch `binary-<arch>/` directories with `Architecture: all` in every index |
+| **RPM (.rpm)** | x86_64, aarch64, armv7hl, armv6l, i686, ppc64le, s390x, riscv64, noarch | Single flat repo; `dnf`/`yum` filters by client architecture |
+| **OpenWrt (.ipk)** | mipsel_24kc, mips_24kc, arm_cortex-a7, aarch64_cortex-a53, x86_64, i386_pentium4, and more | Pure-Python metadata generation; per-target feeds |
 | **Generic** | any | No architecture handling — files are served as-is |
+
+**Docker image platforms:** `linux/amd64`, `linux/arm64`, `linux/arm/v7`  
+**CI package builds:** DEB (amd64, arm64, armhf, i386) | RPM (x86_64, aarch64, armv7hl, i686)
 
 Having the same package name and version for different architectures (e.g., `myapp_1.0_amd64.deb` and `myapp_1.0_arm64.deb`) in the same repository is **correct and standard practice** for both Debian and RPM ecosystems.
 
