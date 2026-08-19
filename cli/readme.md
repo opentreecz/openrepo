@@ -2,6 +2,8 @@
   <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="150"/>
 </p>
 
+> **Full documentation:** [opentreecz.github.io/openrepo/cli](https://opentreecz.github.io/openrepo/cli)
+
 # openrepo_cli
 
 The OpenRepo Command Line Interface (CLI) provides an easy way to integrate OpenRepo with CI/CD pipelines — upload packages when a build finishes, promote packages through environments, query repo state, and more.

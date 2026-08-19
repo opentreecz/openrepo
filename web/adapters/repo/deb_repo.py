@@ -113,28 +113,49 @@ class DebRepoAdapter(BaseRepoAdapter):
         self._copy_packages(package_dest)
 
         exec_commands = []
-        aptftp_options = f"--db {settings.DEB_DB_PATH} -o APT::FTPArchive::AlwaysStat=true"
 
-        if self.repo_db_obj.multi_arch and len(architectures) > 1:
-            # Per-architecture Packages index.
-            # arch=all packages must appear in every arch's index (Debian policy).
-            for arch in architectures:
-                exec_commands.append(
-                    f"apt-ftparchive {aptftp_options} packages "
-                    f"--arch {arch} pool/ "
-                    f"> dists/stable/main/binary-{arch}/Packages"
-                )
-                exec_commands.append(
-                    f"gzip -k dists/stable/main/binary-{arch}/Packages"
-                )
+        # Check if we should use pure-Python fallback tools (OpenWrt only)
+        use_python_tools = os.environ.get("OPENREPO_USE_PYTHON_TOOLS") == "1"
+
+        if use_python_tools:
+            # Pure-Python fallback: generate Packages/Packages.gz without apt-ftparchive.
+            # This path is ONLY used on OpenWrt where apt-ftparchive is unavailable.
+            from .fallback_tools import generate_packages_file
+
+            pool_dir = os.path.join(repo_path, "pool")
+            if self.repo_db_obj.multi_arch and len(architectures) > 1:
+                for arch in architectures:
+                    output_dir = os.path.join(repo_path, f"dists/stable/main/binary-{arch}")
+                    generate_packages_file(pool_dir, output_dir, arch=arch)
+            else:
+                arch = architectures[0]
+                for poolname in poolnames:
+                    output_dir = os.path.join(repo_path, f"dists/stable/{poolname}/binary-{arch}")
+                    generate_packages_file(pool_dir, output_dir, arch=None)
         else:
-            # Legacy single-arch (or only one real arch present)
-            arch = architectures[0]
-            for poolname in poolnames:
-                exec_commands.append(
-                    f"apt-ftparchive {aptftp_options} packages pool/ "
-                    f"> dists/stable/{poolname}/binary-{arch}/Packages"
-                )
+            # Standard path: use apt-ftparchive (Docker, DEB, RPM, Arch, bare-metal)
+            aptftp_options = f"--db {settings.DEB_DB_PATH} -o APT::FTPArchive::AlwaysStat=true"
+
+            if self.repo_db_obj.multi_arch and len(architectures) > 1:
+                # Per-architecture Packages index.
+                # arch=all packages must appear in every arch's index (Debian policy).
+                for arch in architectures:
+                    exec_commands.append(
+                        f"apt-ftparchive {aptftp_options} packages "
+                        f"--arch {arch} pool/ "
+                        f"> dists/stable/main/binary-{arch}/Packages"
+                    )
+                    exec_commands.append(
+                        f"gzip -k dists/stable/main/binary-{arch}/Packages"
+                    )
+            else:
+                # Legacy single-arch (or only one real arch present)
+                arch = architectures[0]
+                for poolname in poolnames:
+                    exec_commands.append(
+                        f"apt-ftparchive {aptftp_options} packages pool/ "
+                        f"> dists/stable/{poolname}/binary-{arch}/Packages"
+                    )
                 exec_commands.append(
                     f"gzip -k dists/stable/{poolname}/binary-{arch}/Packages"
                 )

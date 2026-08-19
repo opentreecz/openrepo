@@ -38,14 +38,27 @@ class RpmRepoAdapter(BaseRepoAdapter):
         # Symlink all files in the repo
         self._copy_packages(repo_path)
 
-        # createrepo caches MD5 sums for files it has already seen
-        # This saves significant time on regenerating the repo
-        if not os.path.isdir(settings.RPM_CACHE_DIR):
-            os.makedirs(settings.RPM_CACHE_DIR)
+        # Check if we should use pure-Python fallback tools (OpenWrt only)
+        use_python_tools = os.environ.get("OPENREPO_USE_PYTHON_TOOLS") == "1"
 
-        exec_commands = [
-            f"createrepo --cachedir {settings.RPM_CACHE_DIR} {repo_path}",
-        ]
+        exec_commands = []
+
+        if use_python_tools:
+            # Pure-Python fallback: generate repomd.xml without createrepo_c.
+            # This path is ONLY used on OpenWrt where createrepo_c is unavailable.
+            from .fallback_tools import generate_rpm_repodata
+
+            generate_rpm_repodata(repo_path)
+        else:
+            # Standard path: use createrepo_c (Docker, DEB, RPM, Arch, bare-metal)
+            # createrepo caches MD5 sums for files it has already seen
+            # This saves significant time on regenerating the repo
+            if not os.path.isdir(settings.RPM_CACHE_DIR):
+                os.makedirs(settings.RPM_CACHE_DIR)
+
+            exec_commands = [
+                f"createrepo --cachedir {settings.RPM_CACHE_DIR} {repo_path}",
+            ]
 
         if self.pgp_key is None:
             self._buildlog_write(

@@ -56,11 +56,16 @@ Default credentials: `admin` / `admin` — **change immediately after first logi
 - [Features](features) — multi-arch repos, retention policies, promotion, signing
 - [REST API](api) — full endpoint reference
 - [CLI](cli) — command-line interface for CI/CD
+- [Multi-Architecture Guide](architecture-guide) — supported architectures, multi-arch setup
 - [Development](development) — architecture, dev setup, tests, management commands
+- [Bare-Metal Deployment](bare-metal) — systemd, OpenRC, SysVinit, Alpine Linux
+- [OpenWrt Deployment](openwrt) — full server on OpenWrt with procd
 
 ---
 
 ## Source & License
+
+> **GitHub Repository:** [github.com/opentreecz/openrepo](https://github.com/opentreecz/openrepo) — source code, issues, pull requests, releases
 
 Source code: [github.com/opentreecz/openrepo](https://github.com/opentreecz/openrepo)
 

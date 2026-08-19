@@ -98,3 +98,11 @@ To add a user:
 
 {: .note }
 **From versions using `keep_only_latest`:** This flag has been replaced by [retention policies](features#package-retention-policies). Existing repos with `keep_only_latest=True` are automatically migrated to `retention_policy=keep_latest_n` with `retention_keep_count=1`. No manual action required.
+
+---
+
+## Other deployment methods
+
+- [Bare-Metal Deployment](bare-metal) — install on Debian/Ubuntu, RHEL/Fedora, Arch Linux, Alpine Linux with systemd/OpenRC/SysVinit
+- [OpenWrt Deployment](openwrt) — full server on OpenWrt with procd init and pure-Python tools
+- [Multi-Architecture Guide](architecture-guide) — how to host packages for multiple CPU architectures in one repository

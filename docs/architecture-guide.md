@@ -103,6 +103,7 @@ Generic repositories have no architecture handling — files are served as-is.
 | `armhf` | 32-bit ARM with hardware floating-point |
 | `armel` | 32-bit ARM with software floating-point |
 | `i386` | 32-bit x86 |
+| `loongarch64` | 64-bit Loongson (added to Debian 2023) |
 | `riscv64` | 64-bit RISC-V |
 | `s390x` | IBM System z |
 | `ppc64el` | 64-bit PowerPC (little-endian) |
@@ -117,10 +118,28 @@ Generic repositories have no architecture handling — files are served as-is.
 | `x86_64` | 64-bit x86 (Intel/AMD) |
 | `aarch64` | 64-bit ARM (AArch64) |
 | `armv7hl` | 32-bit ARM with hardware floating-point |
+| `armv6l` | 32-bit ARM (Raspberry Pi Zero/1) |
 | `i686` | 32-bit x86 |
 | `ppc64le` | 64-bit PowerPC (little-endian) |
 | `s390x` | IBM System z |
 | `riscv64` | 64-bit RISC-V |
+
+### OpenWrt architectures
+
+| Architecture | Description |
+|---|---|
+| `all` | Architecture-independent (ipk) |
+| `mipsel_24kc` | MIPS little-endian (MediaTek MT76x8, Ramips) |
+| `mips_24kc` | MIPS big-endian (Atheros/QCA) |
+| `arm_cortex-a7_neon-vfpv4` | ARM Cortex-A7 (MT7621, Allwinner) |
+| `arm_cortex-a9_vfpv3-d16` | ARM Cortex-A9 (Marvell, Broadcom) |
+| `arm_cortex-a15_neon-vfpv4` | ARM Cortex-A15 (IPQ platforms) |
+| `aarch64_cortex-a53` | AArch64 Cortex-A53 (RPi 3/4, modern routers) |
+| `aarch64_cortex-a72` | AArch64 Cortex-A72 |
+| `aarch64_generic` | Generic AArch64 |
+| `x86_64` | x86 routers / VMs |
+| `i386_pentium4` | 32-bit x86 |
+| `riscv64_riscv64` | RISC-V |
 
 ---
 
@@ -261,3 +280,32 @@ A: No. A single repo with `multi_arch` enabled handles all architectures. This i
 **Q: What about `Architecture: all` packages?**
 
 A: They are automatically included in every architecture index (per Debian Policy). No special handling is needed from the user.
+
+---
+
+## OpenWrt deployment
+
+OpenRepo can run as a full server on OpenWrt devices (requires 256MB+ RAM and 128MB+ storage). On OpenWrt, native C tools (`apt-ftparchive`, `createrepo_c`) are not available, so OpenRepo uses **pure-Python fallback tools** for generating repository metadata.
+
+This is controlled by the `OPENREPO_USE_PYTHON_TOOLS=1` environment variable, which is set automatically by the OpenWrt procd init script. **This fallback only applies to OpenWrt deployments** — all other platforms (Docker, DEB, RPM, Arch, bare-metal) continue using native tools.
+
+See the dedicated [OpenWrt Deployment](openwrt) page for full installation and configuration instructions.
+
+---
+
+## Future package formats (roadmap)
+
+The following package formats are planned or under consideration for future OpenRepo releases:
+
+| Format | Extension | Ecosystem | Status |
+|---|---|---|---|
+| **Alpine APK** | `.apk` | Alpine Linux, Docker base images | Planned |
+| **Flatpak** | `.flatpak` | Desktop Linux (sandboxed) | Under consideration |
+| **AppImage** | `.AppImage` | Desktop Linux (portable) | Under consideration |
+| **Snap** | `.snap` | Ubuntu, IoT devices | Under consideration |
+| **Nix** | `.nix` | NixOS (declarative, reproducible) | Under consideration |
+| **Void XBPS** | `.xbps` | Void Linux | Under consideration |
+| **Gentoo ebuild** | `.ebuild` | Gentoo/Calculate/Funtoo (source-based) | Under consideration |
+| **FreeBSD pkg** | `.pkg` | FreeBSD | Under consideration |
+
+Community contributions for any of these formats are welcome. See the [CONTRIBUTING guide](https://github.com/opentreecz/openrepo/blob/main/CONTRIBUTING.md) for how to add a new package format adapter.
