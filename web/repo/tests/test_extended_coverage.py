@@ -654,3 +654,93 @@ class BaseFileAdapterTestCase(APITestCase):
         adapter = RepoFileAdapter("/path", "file")
         with self.assertLogs("openrepo_web", level=logging.WARNING):
             adapter.get_builddate()
+
+
+class URLRoutingValidationTestCase(APITestCase):
+    """Validate that API URL patterns resolve correctly.
+
+    These tests use django.urls.reverse() to ensure named URL patterns
+    produce the expected paths.  A mismatch here would cause clients to
+    hit 404s (the root cause of the duplicate-upload bug where
+    /api/repos/<uid>/packages/ was called instead of /api/<uid>/packages/).
+    """
+
+    def test_package_list_url_uses_repo_uid_prefix(self):
+        """GET package-list resolves to /api/<repo_uid>/packages/ (no /repos/ prefix)"""
+        from django.urls import reverse
+
+        url = reverse("package-list", kwargs={"repo_uid": "my-repo"})
+        self.assertEqual(url, "/api/my-repo/packages/")
+        self.assertNotIn("/repos/", url)
+
+    def test_upload_url_uses_repo_uid_prefix(self):
+        """POST upload resolves to /api/<repo_uid>/upload/"""
+        from django.urls import reverse
+
+        url = reverse("upload", kwargs={"repo_uid": "my-repo"})
+        self.assertEqual(url, "/api/my-repo/upload/")
+
+    def test_package_detail_url(self):
+        """GET package-detail resolves to /api/<repo_uid>/pkg/<package_uid>/"""
+        from django.urls import reverse
+
+        url = reverse("package-detail", kwargs={"repo_uid": "my-repo", "package_uid": "pkg-1"})
+        self.assertEqual(url, "/api/my-repo/pkg/pkg-1/")
+
+    def test_upload_status_url(self):
+        """GET upload-status resolves to /api/upload-status/<task_id>/"""
+        import uuid
+
+        from django.urls import reverse
+
+        task_id = uuid.UUID("12345678-1234-5678-1234-567812345678")
+        url = reverse("upload-status", kwargs={"task_id": task_id})
+        self.assertEqual(url, "/api/upload-status/12345678-1234-5678-1234-567812345678/")
+
+    def test_package_list_endpoint_returns_200_for_valid_repo(self):
+        """GET /api/<repo_uid>/packages/ returns 200 (not 404) for a valid repo"""
+        User = get_user_model()
+        admin = User.objects.create_superuser(username="url_test_admin", password="password123")
+        token = Token.objects.get(user=admin).key
+        signing_key = PGPSigningKey.objects.create(
+            name="URL Test Key",
+            email="url@example.com",
+            fingerprint="URL_TEST_FP",
+            public_key_pem="pub",
+            private_key_pem="priv",
+        )
+        Repository.objects.create(repo_uid="url-test-repo", repo_type="deb", signing_key=signing_key)
+
+        response = self.client.get(
+            "/api/url-test-repo/packages/",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 0)
+
+    def test_repos_prefix_packages_returns_404(self):
+        """GET /api/repos/<repo_uid>/packages/ must return 404.
+
+        This is the bug regression test: the openrepo-sync client was
+        incorrectly calling /api/repos/<uid>/packages/ instead of
+        /api/<uid>/packages/.  The /api/repos/ prefix is the DRF router
+        for Repository CRUD, not for package listing.
+        """
+        User = get_user_model()
+        admin = User.objects.create_superuser(username="url_test_admin2", password="password123")
+        token = Token.objects.get(user=admin).key
+        signing_key = PGPSigningKey.objects.create(
+            name="URL Test Key 2",
+            email="url2@example.com",
+            fingerprint="URL_TEST_FP2",
+            public_key_pem="pub",
+            private_key_pem="priv",
+        )
+        Repository.objects.create(repo_uid="url-test-repo2", repo_type="deb", signing_key=signing_key)
+
+        response = self.client.get(
+            "/api/repos/url-test-repo2/packages/",
+            HTTP_AUTHORIZATION=f"Token {token}",
+        )
+        # This MUST be 404 — /api/repos/<uid>/packages/ is NOT a valid endpoint
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

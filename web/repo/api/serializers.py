@@ -124,7 +124,7 @@ class RepoDetailSerializer(serializers.HyperlinkedModelSerializer):
         disallowed_names = [
             "back", "api", "admin", "api-auth", "static",
             "users", "repos", "signingkeys", "builds", "buildlogs",
-            "whoami", "upload-status",
+            "whoami", "upload-status", "packages", "pkg",
         ]
         if attrs["repo_uid"] in disallowed_names:
             raise serializers.ValidationError(
