@@ -7,9 +7,14 @@ on:
 
 jobs:
   python-lint:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
 
       - name: Install flake8
         run: pip install -r web/dev-requirements.txt
@@ -23,9 +28,16 @@ jobs:
         run: flake8 --config=.flake8 .
 
   frontend-lint:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '20.14.0'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         working-directory: frontend
