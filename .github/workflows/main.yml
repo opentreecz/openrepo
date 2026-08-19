@@ -11,7 +11,7 @@ on:
 
 jobs:
   test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     env:
       OPENREPO_VAR_DIR: /tmp/openrepo/
@@ -60,10 +60,15 @@ jobs:
           path: web/coverage.xml
 
   cli-tests:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
 
       - name: Install CLI dependencies
         working-directory: cli
