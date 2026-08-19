@@ -4,6 +4,10 @@ title: Home
 nav_order: 1
 ---
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="150"/>
+</p>
+
 # OpenRepo
 
 **OpenRepo** is a self-hosted web server for managing and hosting Debian APT, Red Hat RPM, and generic package repositories.

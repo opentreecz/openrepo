@@ -4,6 +4,8 @@ theme: just-the-docs
 url: "https://opentreecz.github.io"
 baseurl: "/openrepo"
 
+logo: "https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg"
+
 nav_sort: case_insensitive
 color_scheme: light
 
@@ -13,4 +15,4 @@ aux_links:
 
 aux_links_new_tab: true
 
-footer_content: "OpenRepo — AGPL-3.0 license"
+footer_content: "OpenRepo by <a href=\"https://opentree.cz\">opentree.cz</a> — AGPL-3.0 license"

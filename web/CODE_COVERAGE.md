@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="150"/>
+</p>
+
 # Code Coverage Report — OpenRepo
 
 > Generated on: 2026-06-17  

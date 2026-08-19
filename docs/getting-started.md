@@ -4,6 +4,10 @@ title: Getting Started
 nav_order: 2
 ---
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="120"/>
+</p>
+
 # Getting Started
 {: .no_toc }
 

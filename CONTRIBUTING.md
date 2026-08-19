@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="150"/>
+</p>
+
 # Contributing to OpenRepo
 
 Thank you for your interest in contributing to OpenRepo! This document provides guidelines and instructions for contributing.

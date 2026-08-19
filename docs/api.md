@@ -4,6 +4,10 @@ title: REST API
 nav_order: 4
 ---
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="120"/>
+</p>
+
 # REST API
 {: .no_toc }
 
