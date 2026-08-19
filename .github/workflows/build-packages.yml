@@ -14,7 +14,7 @@ on:
 jobs:
   build-deb:
     name: Build DEB Package
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [amd64, arm64, armhf, i386]
@@ -70,7 +70,7 @@ jobs:
 
   build-rpm:
     name: Build RPM Package
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [x86_64, aarch64, armv7hl, i686]
@@ -127,7 +127,7 @@ jobs:
     name: Attach to Release
     needs: [build-deb, build-rpm]
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
