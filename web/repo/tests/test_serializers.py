@@ -95,6 +95,39 @@ class SerializerValidationTestCase(APITestCase):
         )
         self.assertEqual(response.status_code, 201)
 
+    def test_repo_uid_disallowed_name_repos_rejected(self):
+        """repo_uid of 'repos' is rejected — it would shadow the DRF router prefix"""
+        response = self.client.post(
+            "/api/repos/",
+            {"repo_uid": "repos", "repo_type": "deb", "signing_key": self.signing_key.fingerprint},
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("repo_uid", response.data)
+
+    def test_repo_uid_disallowed_name_packages_rejected(self):
+        """repo_uid of 'packages' is rejected — it would shadow API paths"""
+        response = self.client.post(
+            "/api/repos/",
+            {"repo_uid": "packages", "repo_type": "deb", "signing_key": self.signing_key.fingerprint},
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("repo_uid", response.data)
+
+    def test_repo_uid_disallowed_name_pkg_rejected(self):
+        """repo_uid of 'pkg' is rejected — it would shadow package detail paths"""
+        response = self.client.post(
+            "/api/repos/",
+            {"repo_uid": "pkg", "repo_type": "deb", "signing_key": self.signing_key.fingerprint},
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("repo_uid", response.data)
+
 
 class PromoteToValidationTestCase(APITestCase):
     def setUp(self):
