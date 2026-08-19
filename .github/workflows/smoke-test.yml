@@ -1,0 +1,89 @@
+name: Smoke Test
+
+on:
+  workflow_run:
+    workflows: ["Build and Push Docker Image"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  smoke-test:
+    name: Docker Compose Smoke Test
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start services
+        run: |
+          docker compose up -d
+          echo "Waiting for services to be healthy..."
+
+      - name: Wait for health checks
+        run: |
+          # Wait up to 120 seconds for all services to be healthy
+          timeout=120
+          elapsed=0
+          while [ $elapsed -lt $timeout ]; do
+            healthy=$(docker compose ps --format json | jq -r '.Health // "unknown"' | grep -c "healthy" || true)
+            total=$(docker compose ps --format json | jq -r '.Health // "unknown"' | wc -l)
+            echo "Healthy: $healthy / $total (elapsed: ${elapsed}s)"
+            if [ "$healthy" -ge 3 ]; then
+              echo "All services healthy!"
+              break
+            fi
+            sleep 5
+            elapsed=$((elapsed + 5))
+          done
+
+          if [ $elapsed -ge $timeout ]; then
+            echo "::error::Services did not become healthy within ${timeout}s"
+            docker compose logs
+            exit 1
+          fi
+
+      - name: Test health endpoint
+        run: |
+          response=$(curl -sf http://localhost:7376/health/ || echo "FAILED")
+          if [ "$response" = "FAILED" ]; then
+            echo "::error::Health endpoint not responding"
+            docker compose logs nginx
+            exit 1
+          fi
+          echo "Health endpoint OK: $response"
+
+      - name: Test API endpoint
+        run: |
+          response=$(curl -sf http://localhost:7376/api/repos/ || echo "FAILED")
+          if [ "$response" = "FAILED" ]; then
+            echo "::error::API endpoint not responding"
+            docker compose logs django
+            exit 1
+          fi
+          echo "API response: $response"
+
+      - name: Test frontend loads
+        run: |
+          response=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:7376/)
+          if [ "$response" != "200" ]; then
+            echo "::error::Frontend returned HTTP $response"
+            exit 1
+          fi
+          echo "Frontend loads OK (HTTP 200)"
+
+      - name: Test API authentication
+        run: |
+          # Attempt to create a repo without auth (should fail with 401/403)
+          response=$(curl -sf -o /dev/null -w "%{http_code}" -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"repo_uid":"test","repo_type":"deb","signing_key":""}' \
+            http://localhost:7376/api/repos/)
+          if [ "$response" = "201" ]; then
+            echo "::error::API should require authentication for repo creation"
+            exit 1
+          fi
+          echo "Authentication enforced (HTTP $response)"
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v

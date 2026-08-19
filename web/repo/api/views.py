@@ -180,7 +180,12 @@ class PackagesViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         repo_uid = self.kwargs["repo_uid"]
-        return Package.objects.filter(repo__repo_uid=repo_uid).select_related("repo")
+        queryset = Package.objects.filter(repo__repo_uid=repo_uid).select_related("repo")
+        # Optional architecture filter
+        architecture = self.request.query_params.get("architecture")
+        if architecture:
+            queryset = queryset.filter(architecture=architecture)
+        return queryset
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)

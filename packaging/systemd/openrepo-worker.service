@@ -1,0 +1,35 @@
+[Unit]
+Description=OpenRepo Background Worker (Repository Regeneration)
+Documentation=https://opentreecz.github.io/openrepo/
+After=network.target postgresql.service openrepo-web.service
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=openrepo
+Group=openrepo
+WorkingDirectory=/opt/openrepo
+Environment=OPENREPO_VAR_DIR=/var/lib/openrepo/
+Environment=OPENREPO_DB_TYPE=postgresql
+EnvironmentFile=-/etc/openrepo/openrepo.env
+
+ExecStart=/opt/openrepo/venv/bin/python manage.py runworker
+
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=openrepo-worker
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/openrepo
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target

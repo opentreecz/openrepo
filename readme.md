@@ -1,6 +1,27 @@
 # openrepo
 
-**Documentation:** [https://opentreecz.github.io/openrepo/](https://opentreecz.github.io/openrepo/)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="200"/>
+</p>
+
+<p align="center">
+  <strong>Open Source repository management for deb, rpm, and generic packages</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/opentreecz/openrepo/actions/workflows/main.yml"><img src="https://github.com/opentreecz/openrepo/actions/workflows/main.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/opentreecz/openrepo/actions/workflows/lint.yml"><img src="https://github.com/opentreecz/openrepo/actions/workflows/lint.yml/badge.svg" alt="Lint"></a>
+  <a href="https://github.com/opentreecz/openrepo/actions/workflows/docker-build.yml"><img src="https://github.com/opentreecz/openrepo/actions/workflows/docker-build.yml/badge.svg" alt="Docker"></a>
+  <a href="https://github.com/opentreecz/openrepo/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue.svg" alt="License"></a>
+</p>
+
+---
+
+**Documentation:** [https://opentreecz.github.io/openrepo/](https://opentreecz.github.io/openrepo/)  
+**Container Registry:** [ghcr.io/opentreecz/openrepo](https://github.com/opentreecz/openrepo/pkgs/container/openrepo)  
+**Organization:** [opentree.cz](https://opentree.cz)
+
+---
 
 OpenRepo is a web-based server for managing and hosting repositories containing Debian apt/deb, Red Hat rpm, and generic package files.
 
@@ -241,16 +262,19 @@ cd frontend && npm run lint
 
 ### CI/CD workflows
 
-Three GitHub Actions workflows run on every push:
+GitHub Actions workflows run on every push:
 
 | Workflow | File | Triggers |
 |---|---|---|
-| **CI** (Django + CLI tests) | `.github/workflows/main.yml` | push, pull_request, weekly schedule |
+| **CI** (Django + CLI tests + coverage) | `.github/workflows/main.yml` | push, pull_request, weekly schedule |
 | **Lint** (flake8 + ESLint) | `.github/workflows/lint.yml` | push, pull_request |
-| **Docker build & push** | `.github/workflows/docker-build.yml` | push to `main`, version tags, weekly schedule |
+| **Docker build & push** (multi-arch: amd64, arm64) | `.github/workflows/docker-build.yml` | push to `main`, version tags, weekly schedule |
+| **Package build** (DEB + RPM) | `.github/workflows/build-packages.yml` | version tags, manual dispatch |
+| **PR Review** (automated checks) | `.github/workflows/pr-review.yml` | pull_request |
+| **Smoke Test** | `.github/workflows/smoke-test.yml` | after Docker build, manual |
 | **GitHub Pages** | `.github/workflows/pages.yml` | push to `main` |
 
-The Docker workflow pushes to `ghcr.io/opentreecz/openrepo:latest` and also tags by git SHA and semver.  The weekly scheduled runs rebuild against the latest base images so security patches land even without a code change.
+The Docker workflow pushes multi-architecture images (linux/amd64, linux/arm64) to `ghcr.io/opentreecz/openrepo:latest` and also tags by git SHA and semver.  The weekly scheduled runs rebuild against the latest base images so security patches land even without a code change.
 
 ### Code coverage
 
@@ -262,3 +286,66 @@ coverage run manage.py test repo.tests
 coverage report
 coverage html -d htmlcov/
 ```
+
+## Installation Methods
+
+### Docker (recommended)
+
+See [Getting Started](#getting-started) above.
+
+### DEB package (Debian/Ubuntu)
+
+Download the `.deb` from the [latest release](https://github.com/opentreecz/openrepo/releases) and install:
+
+```bash
+sudo apt install ./openrepo_*.deb
+sudo systemctl enable --now openrepo-web openrepo-worker
+```
+
+### RPM package (Fedora/RHEL/CentOS)
+
+Download the `.rpm` from the [latest release](https://github.com/opentreecz/openrepo/releases) and install:
+
+```bash
+sudo dnf install ./openrepo-*.rpm
+sudo systemctl enable --now openrepo-web openrepo-worker
+```
+
+### Arch Linux
+
+A PKGBUILD is available in `packaging/archlinux/`. Build with `makepkg`:
+
+```bash
+cd packaging/archlinux
+makepkg -si
+sudo systemctl enable --now openrepo-web openrepo-worker
+```
+
+### Bare-metal deployment
+
+See [docs/bare-metal.md](docs/bare-metal.md) for detailed instructions on deploying without Docker, including systemd, OpenRC, and SysVinit service configurations.
+
+## Supported Architectures
+
+OpenRepo handles multiple CPU architectures in a single repository:
+
+| Package Type | Supported Architectures | How it works |
+|---|---|---|
+| **Debian (.deb)** | amd64, arm64, armhf, armel, i386, riscv64, s390x, mips64el, ppc64el, all | Per-arch `binary-<arch>/` directories with `Architecture: all` in every index |
+| **RPM (.rpm)** | x86_64, aarch64, armv7hl, i686, ppc64le, s390x, riscv64, noarch | Single flat repo; `dnf`/`yum` filters by client architecture |
+| **Generic** | any | No architecture handling — files are served as-is |
+
+Having the same package name and version for different architectures (e.g., `myapp_1.0_amd64.deb` and `myapp_1.0_arm64.deb`) in the same repository is **correct and standard practice** for both Debian and RPM ecosystems.
+
+## Contributing
+
+We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+
+- Setting up your development environment
+- Coding standards and testing requirements
+- Submitting pull requests
+- Reporting issues
+
+## License
+
+OpenRepo is licensed under the [GNU Affero General Public License v3.0](LICENSE).

@@ -1,0 +1,34 @@
+#!/usr/bin/make -f
+
+export DH_VERBOSE = 1
+export OPENREPO_VERSION ?= 0.0.0
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Build frontend
+	cd frontend && npm ci && npm run build
+	# Create Python virtualenv with dependencies
+	python3 -m venv debian/openrepo/opt/openrepo/venv
+	debian/openrepo/opt/openrepo/venv/bin/pip install --no-cache-dir -r web/requirements.txt
+
+override_dh_auto_install:
+	# Install application
+	install -d debian/openrepo/opt/openrepo
+	cp -r web/* debian/openrepo/opt/openrepo/
+	cp -r frontend/dist debian/openrepo/opt/openrepo/frontend-dist
+	# Install systemd service files
+	install -d debian/openrepo/lib/systemd/system
+	cp packaging/systemd/openrepo-web.service debian/openrepo/lib/systemd/system/
+	cp packaging/systemd/openrepo-worker.service debian/openrepo/lib/systemd/system/
+	# Install nginx config
+	install -d debian/openrepo/etc/nginx/sites-available
+	cp deploy/nginx/nginx.conf.prod debian/openrepo/etc/nginx/sites-available/openrepo
+	# Install default config
+	install -d debian/openrepo/etc/openrepo
+	cp .env.example debian/openrepo/etc/openrepo/openrepo.env
+
+override_dh_auto_test:
+	# Tests are run separately in CI
+	true

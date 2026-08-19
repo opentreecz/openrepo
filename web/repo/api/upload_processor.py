@@ -6,6 +6,7 @@ from django.conf import settings
 from django.db import close_old_connections
 
 from adapters.file import create_adapter
+from repo.constants import is_known_architecture
 from repo.models import Package, UploadTask
 
 from .retention import apply_retention_policy
@@ -82,6 +83,15 @@ def process_upload(task_id):
         package.version = file_info_adapter.get_version()
         package.package_name = file_info_adapter.get_name()
         package.checksum_sha512 = sha512
+
+        # Warn if architecture is not in the known set for this repo type
+        if not is_known_architecture(package.architecture, repo.repo_type):
+            logger.warning(
+                f"Package '{package.package_name}' has unknown architecture "
+                f"'{package.architecture}' for repo type '{repo.repo_type}'. "
+                f"The package will still be accepted."
+            )
+
         package.save()
 
         apply_retention_policy(repo, package.package_name, package.architecture)

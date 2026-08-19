@@ -1,0 +1,31 @@
+Source: openrepo
+Section: web
+Priority: optional
+Maintainer: opentree.cz <info@opentree.cz>
+Build-Depends: debhelper-compat (= 13),
+               python3,
+               python3-venv,
+               nodejs (>= 20),
+               npm
+Standards-Version: 4.6.2
+Homepage: https://github.com/opentreecz/openrepo
+Vcs-Git: https://github.com/opentreecz/openrepo.git
+Vcs-Browser: https://github.com/opentreecz/openrepo
+
+Package: openrepo
+Architecture: all
+Depends: ${misc:Depends},
+         python3 (>= 3.10),
+         python3-venv,
+         nginx,
+         postgresql,
+         createrepo-c,
+         gnupg,
+         libapt-pkg-dev,
+         gunicorn
+Description: Web-based package repository management server
+ OpenRepo is a self-hosted web server for managing and hosting
+ Debian apt/deb, Red Hat rpm, and generic file repositories.
+ It provides a web UI, REST API, CLI tool, PGP signing,
+ multi-architecture support, retention policies, and package
+ promotion pipelines.

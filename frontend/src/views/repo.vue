@@ -97,16 +97,30 @@
             </v-col>
         </v-layout>
 
-        <v-text-field
-          v-model="search"
-          prepend-inner-icon="mdi-magnify"
-          label="Search packages..."
-          variant="outlined"
-          density="compact"
-          hide-details
-          clearable
-          class="mt-2"
-        ></v-text-field>
+        <v-row class="mt-2" align="center">
+          <v-col cols="8">
+            <v-text-field
+              v-model="search"
+              prepend-inner-icon="mdi-magnify"
+              label="Search packages..."
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            ></v-text-field>
+          </v-col>
+          <v-col cols="4">
+            <v-select
+              v-model="archFilter"
+              :items="archFilterOptions"
+              label="Architecture"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+            ></v-select>
+          </v-col>
+        </v-row>
 
         <v-skeleton-loader
           v-if="loading"
@@ -245,6 +259,8 @@ export default {
             itemsPerPage: 100,
             search: '',
             searchTimer: null,
+            archFilter: null,
+            archFilterOptions: [],
             sortColumn: 'upload_date',
             sortDirection: 'desc',
             settings_href: '/cfg/repo/' + this.$route.params.repo_uid + '/settings/',
@@ -279,6 +295,7 @@ export default {
                 this.repo_details = response.data;
                 this.repo_details.repo_instructions = this.repo_details.repo_instructions.replaceAll("<origin>", window.location.origin);
                 this.is_readonly = !this.is_superuser && this.repo_details.write_access.indexOf(this.username) === -1;
+                this.loadArchitectures();
             })
             .catch(e => {
                 logger.debug(e);
@@ -287,6 +304,18 @@ export default {
                 else
                 this.show_global_error_msg = 'Error loading repo: ' + e.message;
             });
+        },
+        loadArchitectures() {
+            // Fetch packages to extract unique architectures for the filter dropdown
+            PackageDataService.getAll(this.repo_uid, { page_size: 2000 })
+            .then(response => {
+                const archs = new Set<string>();
+                response.data.results.forEach((pkg: any) => {
+                    if (pkg.architecture) archs.add(pkg.architecture);
+                });
+                this.archFilterOptions = Array.from(archs).sort();
+            })
+            .catch(e => { logger.debug(e); });
         },
         format_date(value:Date) {
             return formatDate(value);
@@ -310,7 +339,9 @@ export default {
             return this.sortDirection === 'asc' ? 'mdi-arrow-up' : 'mdi-arrow-down';
         },
         buildParams(extra?: any) {
-            return buildQueryParams(this.page, this.itemsPerPage, this.search, this.sortColumn, this.sortDirection, extra);
+            const params = buildQueryParams(this.page, this.itemsPerPage, this.search, this.sortColumn, this.sortDirection, extra);
+            if (this.archFilter) params.architecture = this.archFilter;
+            return params;
         },
         fetchPage(newPage?: number) {
           this.loading = true;
@@ -409,6 +440,12 @@ export default {
                 if (this.repo_details.repo_uid)
                   this.retrievePackages();
             }, 300);
+        },
+        archFilter()
+        {
+            this.page = 1;
+            if (this.repo_details.repo_uid)
+              this.retrievePackages();
         }
     },
     mounted() {

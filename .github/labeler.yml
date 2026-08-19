@@ -1,0 +1,30 @@
+frontend:
+  - changed-files:
+      - any-glob-to-any-file: 'frontend/**'
+
+backend:
+  - changed-files:
+      - any-glob-to-any-file: 'web/**'
+
+cli:
+  - changed-files:
+      - any-glob-to-any-file: 'cli/**'
+
+documentation:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'docs/**'
+          - '*.md'
+
+ci-cd:
+  - changed-files:
+      - any-glob-to-any-file:
+          - '.github/**'
+          - 'Dockerfile'
+          - 'docker-compose.yml'
+
+deployment:
+  - changed-files:
+      - any-glob-to-any-file:
+          - 'deploy/**'
+          - 'packaging/**'
