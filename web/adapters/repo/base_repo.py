@@ -75,6 +75,10 @@ class BaseRepoAdapter:
         # The <origin> tab will get swapped out in JavaScript by the browser
         self.base_url = f"<origin>/{self.repo_uid}"
 
+        # Initialize packages queryset for use by _get_repo_instructions() and similar.
+        # setup_repo() will re-assign this before repo generation.
+        self.packages = Package.objects.filter(repo__repo_uid=self.repo_uid)
+
     def _copy_packages(self, dest_dir):
 
         with self._buildlog_section(f"Symlinking {len(self.packages)} packages") as log_entry:

@@ -111,6 +111,7 @@ class DebRepoIntegrationTest(APITestCase):
         response = self.client.post('/api/repos/', {
             'repo_uid': 'int-deb', 'repo_type': 'deb',
             'signing_key': self.fingerprint,
+            'multi_arch': False,
         }, HTTP_AUTHORIZATION=self.auth, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 

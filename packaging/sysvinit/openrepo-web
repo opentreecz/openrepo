@@ -1,0 +1,72 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          openrepo-web
+# Required-Start:    $remote_fs $syslog postgresql
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: OpenRepo Web Server
+# Description:       OpenRepo package repository web server (Django/Gunicorn)
+### END INIT INFO
+
+NAME=openrepo-web
+DAEMON=/opt/openrepo/venv/bin/gunicorn
+DAEMON_ARGS="openrepo.wsgi:application --bind 127.0.0.1:8000 --workers 4 --timeout 120 --pid /run/openrepo/web.pid --daemon"
+PIDFILE=/run/openrepo/web.pid
+USER=openrepo
+GROUP=openrepo
+WORKDIR=/opt/openrepo
+
+# Load environment
+export OPENREPO_VAR_DIR="/var/lib/openrepo/"
+export OPENREPO_DB_TYPE="postgresql"
+[ -f /etc/openrepo/openrepo.env ] && . /etc/openrepo/openrepo.env
+
+. /lib/lsb/init-functions
+
+do_start() {
+    mkdir -p /run/openrepo
+    chown $USER:$GROUP /run/openrepo
+
+    # Run migrations
+    su -s /bin/sh $USER -c "cd $WORKDIR && /opt/openrepo/venv/bin/python manage.py migrate --noinput"
+    su -s /bin/sh $USER -c "cd $WORKDIR && /opt/openrepo/venv/bin/python manage.py startup_checks"
+
+    start-stop-daemon --start --quiet --pidfile $PIDFILE \
+        --chuid $USER:$GROUP --chdir $WORKDIR \
+        --exec $DAEMON -- $DAEMON_ARGS
+}
+
+do_stop() {
+    start-stop-daemon --stop --quiet --pidfile $PIDFILE \
+        --retry=TERM/30/KILL/5
+    rm -f $PIDFILE
+}
+
+case "$1" in
+    start)
+        log_daemon_msg "Starting $NAME"
+        do_start
+        log_end_msg $?
+        ;;
+    stop)
+        log_daemon_msg "Stopping $NAME"
+        do_stop
+        log_end_msg $?
+        ;;
+    restart|force-reload)
+        log_daemon_msg "Restarting $NAME"
+        do_stop
+        sleep 1
+        do_start
+        log_end_msg $?
+        ;;
+    status)
+        status_of_proc -p $PIDFILE "$DAEMON" "$NAME"
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|force-reload|status}" >&2
+        exit 1
+        ;;
+esac
+exit 0

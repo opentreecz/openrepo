@@ -1,0 +1,142 @@
+name: Build Packages (DEB/RPM)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Package version (without v prefix)'
+        required: true
+        default: '0.0.1'
+
+jobs:
+  build-deb:
+    name: Build DEB Package
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        if: matrix.arch != 'amd64'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build DEB package
+        run: |
+          docker run --rm \
+            --platform linux/${{ matrix.arch }} \
+            -v ${{ github.workspace }}:/src \
+            -w /src \
+            -e OPENREPO_VERSION=${{ steps.version.outputs.version }} \
+            ubuntu:24.04 bash -c '
+              apt-get update && apt-get install -y \
+                build-essential devscripts debhelper \
+                python3 python3-venv python3-pip \
+                nodejs npm libapt-pkg-dev curl
+              
+              # Update changelog with version
+              sed -i "s/0.0.0-1/${{ steps.version.outputs.version }}-1/" packaging/debian/changelog
+              
+              # Copy debian directory to project root
+              cp -r packaging/debian .
+              
+              # Build the package
+              dpkg-buildpackage -us -uc -b
+              
+              # Move artifacts
+              mkdir -p /src/dist
+              mv /openrepo_*.deb /src/dist/ 2>/dev/null || mv ../*.deb /src/dist/
+            '
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openrepo-deb-${{ matrix.arch }}
+          path: dist/*.deb
+
+  build-rpm:
+    name: Build RPM Package
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="${{ github.event.inputs.version }}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        if: matrix.arch != 'x86_64'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build RPM package
+        run: |
+          docker run --rm \
+            --platform linux/${{ matrix.arch == 'x86_64' && 'amd64' || 'arm64' }} \
+            -v ${{ github.workspace }}:/src \
+            -w /src \
+            -e VERSION=${{ steps.version.outputs.version }} \
+            fedora:40 bash -c '
+              dnf install -y rpm-build rpmdevtools python3-devel nodejs npm createrepo_c
+
+              # Set up rpmbuild directory
+              rpmdev-setuptree
+
+              # Create source tarball
+              mkdir -p openrepo-${VERSION}
+              cp -r web frontend cli deploy packaging .env.example openrepo-${VERSION}/
+              tar czf ~/rpmbuild/SOURCES/openrepo-${VERSION}.tar.gz openrepo-${VERSION}
+
+              # Build the RPM
+              rpmbuild -bb --define "version ${VERSION}" packaging/rpm/openrepo.spec
+
+              # Move artifacts
+              mkdir -p /src/dist
+              find ~/rpmbuild/RPMS -name "*.rpm" -exec cp {} /src/dist/ \;
+            '
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openrepo-rpm-${{ matrix.arch }}
+          path: dist/*.rpm
+
+  release:
+    name: Attach to Release
+    needs: [build-deb, build-rpm]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*

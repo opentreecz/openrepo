@@ -135,6 +135,11 @@ class RepoDetailSerializer(serializers.HyperlinkedModelSerializer):
         if self.instance is None and (attrs.get("signing_key") is None or attrs.get("signing_key") == ""):
             raise serializers.ValidationError({"signing_key": "Signing key is required"})
 
+        # Default multi_arch to True for new deb repos (unless explicitly set to False)
+        if self.instance is None and attrs.get("repo_type") == "deb":
+            if "multi_arch" not in self.initial_data:
+                attrs["multi_arch"] = True
+
         promote_to = attrs.get("promote_to")
         if promote_to:
             conflict = Repository.objects.filter(promote_to=promote_to)

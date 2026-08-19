@@ -4,6 +4,10 @@ title: Features
 nav_order: 3
 ---
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="120"/>
+</p>
+
 # Features
 {: .no_toc }
 

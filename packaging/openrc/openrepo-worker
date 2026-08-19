@@ -1,0 +1,32 @@
+#!/sbin/openrc-run
+# OpenRepo Background Worker
+
+name="OpenRepo Worker"
+description="OpenRepo background worker for repository regeneration"
+
+command="/opt/openrepo/venv/bin/python"
+command_args="manage.py runworker"
+command_user="openrepo:openrepo"
+command_background=true
+pidfile="/run/openrepo/worker.pid"
+directory="/opt/openrepo"
+
+export OPENREPO_VAR_DIR="/var/lib/openrepo/"
+export OPENREPO_DB_TYPE="postgresql"
+
+# Load environment file if it exists
+if [ -f /etc/openrepo/openrepo.env ]; then
+    set -a
+    . /etc/openrepo/openrepo.env
+    set +a
+fi
+
+depend() {
+    need net postgresql openrepo-web
+    after firewall
+    use dns
+}
+
+start_pre() {
+    checkpath --directory --owner openrepo:openrepo --mode 0755 /run/openrepo
+}

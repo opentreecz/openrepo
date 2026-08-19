@@ -1,0 +1,44 @@
+[Unit]
+Description=OpenRepo Web Server (Django/Gunicorn)
+Documentation=https://opentreecz.github.io/openrepo/
+After=network.target postgresql.service
+Requires=postgresql.service
+Wants=openrepo-worker.service
+
+[Service]
+Type=notify
+User=openrepo
+Group=openrepo
+WorkingDirectory=/opt/openrepo
+Environment=OPENREPO_VAR_DIR=/var/lib/openrepo/
+Environment=OPENREPO_DB_TYPE=postgresql
+EnvironmentFile=-/etc/openrepo/openrepo.env
+
+ExecStartPre=/opt/openrepo/venv/bin/python manage.py migrate --noinput
+ExecStartPre=/opt/openrepo/venv/bin/python manage.py startup_checks
+ExecStart=/opt/openrepo/venv/bin/gunicorn \
+    openrepo.wsgi:application \
+    --bind 127.0.0.1:8000 \
+    --workers 4 \
+    --timeout 120 \
+    --access-logfile - \
+    --error-logfile -
+
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=openrepo-web
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/openrepo
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+
+[Install]
+WantedBy=multi-user.target

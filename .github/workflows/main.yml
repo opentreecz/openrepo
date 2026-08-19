@@ -39,12 +39,25 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r web/requirements.txt
 
+      - name: Install coverage
+        run: pip install coverage
+
       - name: Prepare var directory
         run: mkdir -p /tmp/openrepo/packages /tmp/openrepo/keyring /tmp/openrepo/www /tmp/openrepo/rpmcache
 
-      - name: Run tests
+      - name: Run tests with coverage
         working-directory: web
-        run: python manage.py test repo.tests --verbosity=2
+        run: |
+          coverage run manage.py test repo.tests --verbosity=2
+          coverage report --show-missing --fail-under=85
+          coverage xml -o coverage.xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: web/coverage.xml
 
   cli-tests:
     runs-on: ubuntu-latest

@@ -1,0 +1,138 @@
+.TH OPENREPO 1 "2024-01-01" "OpenRepo" "User Commands"
+.SH NAME
+openrepo \- command-line client for OpenRepo package repository management
+.SH SYNOPSIS
+.B openrepo
+[\fB\-k\fR \fIKEY\fR]
+[\fB\-s\fR \fISERVER\fR]
+[\fB\-\-debug\fR]
+[\fB\-\-json\fR]
+\fICOMMAND\fR [\fIOPTIONS\fR]
+.SH DESCRIPTION
+.B openrepo
+is the command-line interface for interacting with an OpenRepo server.
+It supports uploading packages, listing repositories and packages,
+copying packages between repos, and managing repository operations
+from CI/CD pipelines or the command line.
+.PP
+OpenRepo supports Debian/APT (.deb), Red Hat/RPM (.rpm), and generic
+file repositories with multi-architecture support.
+.SH OPTIONS
+.TP
+.BR \-k ", " \-\-key " " \fIKEY\fR
+API authentication token. Can also be set via the
+.B OPENREPO_APIKEY
+environment variable.
+.TP
+.BR \-s ", " \-\-server " " \fISERVER\fR
+OpenRepo server URL (default: http://localhost:7376). Can also be set
+via the
+.B OPENREPO_SERVER
+environment variable.
+.TP
+.B \-\-debug
+Enable debug output.
+.TP
+.B \-\-json
+Output results in JSON format instead of human-readable tables.
+.SH COMMANDS
+.SS upload
+Upload one or more package files to a repository.
+.PP
+.B openrepo upload
+\fB\-r\fR \fIREPO_UID\fR
+[\fB\-o\fR]
+\fIFILE\fR [\fIFILE\fR ...]
+.TP
+.BR \-r ", " \-\-repo_uid " " \fIREPO_UID\fR
+Unique ID of the target repository.
+.TP
+.BR \-o ", " \-\-overwrite
+Overwrite existing package if the same name/version/architecture already exists.
+.SS list_repos
+List all repositories on the server.
+.PP
+.B openrepo list_repos
+.SS list_packages
+List packages in a repository.
+.PP
+.B openrepo list_packages
+\fB\-\-repo_uid\fR \fIREPO_UID\fR
+.SS copy_package
+Copy a package from one repository to another.
+.PP
+.B openrepo copy_package
+\fB\-\-repo_uid\fR \fIREPO_UID\fR
+\fB\-\-package_uid\fR \fIPACKAGE_UID\fR
+\fB\-\-dest_repo_uid\fR \fIDEST_REPO_UID\fR
+.SS delete_package
+Delete a package from a repository.
+.PP
+.B openrepo delete_package
+\fB\-\-repo_uid\fR \fIREPO_UID\fR
+\fB\-\-package_uid\fR \fIPACKAGE_UID\fR
+.SH ENVIRONMENT
+.TP
+.B OPENREPO_APIKEY
+API authentication token (alternative to \fB\-k\fR).
+.TP
+.B OPENREPO_SERVER
+Server URL (alternative to \fB\-s\fR). Default: http://localhost:7376
+.SH EXAMPLES
+.PP
+List all repositories:
+.RS
+.nf
+openrepo -k mytoken list_repos
+.fi
+.RE
+.PP
+Upload a Debian package:
+.RS
+.nf
+openrepo -k mytoken upload -r my-deb-repo myapp_1.0_amd64.deb
+.fi
+.RE
+.PP
+Upload multiple architecture packages:
+.RS
+.nf
+openrepo -k mytoken upload -r my-deb-repo \\
+  myapp_1.0_amd64.deb myapp_1.0_arm64.deb myapp_1.0_all.deb
+.fi
+.RE
+.PP
+List packages in a repo (JSON output):
+.RS
+.nf
+openrepo -k mytoken --json list_packages --repo_uid my-deb-repo
+.fi
+.RE
+.PP
+Copy a package to a production repo:
+.RS
+.nf
+openrepo -k mytoken copy_package \\
+  --repo_uid staging --package_uid aa-1234abcd \\
+  --dest_repo_uid production
+.fi
+.RE
+.SH EXIT STATUS
+.TP
+.B 0
+Successful operation.
+.TP
+.B 1
+General error (authentication failure, server error, etc.).
+.SH SEE ALSO
+.BR apt (8),
+.BR dnf (8),
+.BR createrepo_c (8)
+.PP
+Full documentation: https://opentreecz.github.io/openrepo/
+.SH BUGS
+Report bugs at: https://github.com/opentreecz/openrepo/issues
+.SH AUTHORS
+opentree.cz <info@opentree.cz>
+.SH LICENSE
+GNU Affero General Public License v3.0 (AGPL-3.0)

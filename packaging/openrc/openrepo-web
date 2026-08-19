@@ -1,0 +1,37 @@
+#!/sbin/openrc-run
+# OpenRepo Web Server (Django/Gunicorn)
+
+name="OpenRepo Web"
+description="OpenRepo package repository web server"
+
+command="/opt/openrepo/venv/bin/gunicorn"
+command_args="openrepo.wsgi:application --bind 127.0.0.1:8000 --workers 4 --timeout 120"
+command_user="openrepo:openrepo"
+command_background=true
+pidfile="/run/openrepo/web.pid"
+directory="/opt/openrepo"
+
+export OPENREPO_VAR_DIR="/var/lib/openrepo/"
+export OPENREPO_DB_TYPE="postgresql"
+
+# Load environment file if it exists
+if [ -f /etc/openrepo/openrepo.env ]; then
+    set -a
+    . /etc/openrepo/openrepo.env
+    set +a
+fi
+
+depend() {
+    need net postgresql
+    after firewall
+    use dns
+}
+
+start_pre() {
+    checkpath --directory --owner openrepo:openrepo --mode 0755 /run/openrepo
+    checkpath --directory --owner openrepo:openrepo --mode 0755 /var/lib/openrepo
+
+    # Run migrations
+    /opt/openrepo/venv/bin/python /opt/openrepo/manage.py migrate --noinput
+    /opt/openrepo/venv/bin/python /opt/openrepo/manage.py startup_checks
+}

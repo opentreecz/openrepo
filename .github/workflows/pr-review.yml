@@ -1,0 +1,72 @@
+name: PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pr-checks:
+    name: PR Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR title format
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          # Ensure title is not empty and reasonably descriptive
+          if [ ${#TITLE} -lt 10 ]; then
+            echo "::error::PR title should be at least 10 characters long and descriptive"
+            exit 1
+          fi
+
+      - name: Check for large PRs
+        run: |
+          ADDITIONS=${{ github.event.pull_request.additions }}
+          DELETIONS=${{ github.event.pull_request.deletions }}
+          TOTAL=$((ADDITIONS + DELETIONS))
+          if [ $TOTAL -gt 2000 ]; then
+            echo "::warning::This PR has $TOTAL changed lines. Consider splitting into smaller PRs for easier review."
+          fi
+
+      - name: Check for common issues
+        run: |
+          # Check for debug statements left in code
+          if git diff origin/main...HEAD -- '*.py' | grep -E '^\+.*\b(breakpoint|pdb\.set_trace|import pdb)\b'; then
+            echo "::error::Debug statements found in Python code"
+            exit 1
+          fi
+
+          # Check for console.log in production code (not tests)
+          if git diff origin/main...HEAD -- 'frontend/src/**/*.ts' 'frontend/src/**/*.vue' | grep -E '^\+.*console\.(log|debug)\(' | grep -v '// debug' | grep -v 'logger'; then
+            echo "::warning::console.log statements found in frontend code. Consider using the logger utility instead."
+          fi
+
+      - name: Verify no secrets in diff
+        run: |
+          # Basic check for potential secrets
+          if git diff origin/main...HEAD | grep -iE '(password|secret|api_key|token)\s*=\s*["\x27][^"\x27]{8,}'; then
+            echo "::error::Potential hardcoded secret detected in diff. Please review."
+            exit 1
+          fi
+
+  label-pr:
+    name: Label PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Label by files changed
+        uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+        continue-on-error: true

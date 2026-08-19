@@ -4,6 +4,10 @@ title: CLI
 nav_order: 5
 ---
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="120"/>
+</p>
+
 # CLI — openrepo_cli
 {: .no_toc }
 
