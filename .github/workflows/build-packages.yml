@@ -84,18 +84,18 @@ jobs:
               cp deploy/nginx/nginx.conf.prod /tmp/openrepo-deb/etc/nginx/sites-available/openrepo
               cp .env.example /tmp/openrepo-deb/etc/openrepo/openrepo.env
 
-              cat > /tmp/openrepo-deb/DEBIAN/control <<EOF
-Package: openrepo
-Version: $OPENREPO_VERSION-1
-Section: web
-Priority: optional
-Architecture: ${{ matrix.arch }}
-Maintainer: opentree.cz <info@opentree.cz>
-Depends: python3 (>= 3.10), python3-venv, nginx, postgresql, createrepo-c, gnupg, libapt-pkg-dev, gunicorn
-Description: Web-based package repository management server
- OpenRepo is a self-hosted web server for managing and hosting
- Debian apt/deb, Red Hat rpm, and generic file repositories.
-EOF
+              printf '%s\n' \
+                'Package: openrepo' \
+                "Version: $OPENREPO_VERSION-1" \
+                'Section: web' \
+                'Priority: optional' \
+                'Architecture: ${{ matrix.arch }}' \
+                'Maintainer: opentree.cz <info@opentree.cz>' \
+                'Depends: python3 (>= 3.10), python3-venv, nginx, postgresql, createrepo-c, gnupg, libapt-pkg-dev, gunicorn' \
+                'Description: Web-based package repository management server' \
+                ' OpenRepo is a self-hosted web server for managing and hosting' \
+                ' Debian apt/deb, Red Hat rpm, and generic file repositories.' \
+                > /tmp/openrepo-deb/DEBIAN/control
 
               mkdir -p /src/dist
               dpkg-deb --build /tmp/openrepo-deb /src/dist/openrepo_${OPENREPO_VERSION}-1_${{ matrix.arch }}.deb
