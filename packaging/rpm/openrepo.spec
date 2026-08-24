@@ -38,7 +38,7 @@ cd ..
 
 # Create virtualenv
 python3 -m venv %{buildroot}/opt/openrepo/venv
-%{buildroot}/opt/openrepo/venv/bin/pip install --no-cache-dir -r web/requirements.txt
+PIP_CONSTRAINT=web/constraints.txt %{buildroot}/opt/openrepo/venv/bin/pip install --no-cache-dir -r web/requirements.txt
 
 %install
 # Install application
