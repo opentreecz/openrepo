@@ -11,7 +11,7 @@ override_dh_auto_build:
 	cd frontend && npm ci && npm run build
 	# Create Python virtualenv with dependencies
 	python3 -m venv debian/openrepo/opt/openrepo/venv
-	debian/openrepo/opt/openrepo/venv/bin/pip install --no-cache-dir -r web/requirements.txt
+	PIP_CONSTRAINT=web/constraints.txt debian/openrepo/opt/openrepo/venv/bin/pip install --no-cache-dir -r web/requirements.txt
 
 override_dh_auto_install:
 	# Install application
