@@ -3,6 +3,9 @@ Section: web
 Priority: optional
 Maintainer: opentree.cz <info@opentree.cz>
 Build-Depends: debhelper-compat (= 13),
+               libapt-pkg-dev,
+               libffi-dev,
+               libpq-dev,
                python3,
                python3-venv,
                nodejs (>= 20),
@@ -13,7 +16,7 @@ Vcs-Git: https://github.com/opentreecz/openrepo.git
 Vcs-Browser: https://github.com/opentreecz/openrepo
 
 Package: openrepo
-Architecture: all
+Architecture: any
 Depends: ${misc:Depends},
          python3 (>= 3.10),
          python3-venv,

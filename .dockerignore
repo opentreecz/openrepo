@@ -3,3 +3,5 @@
 openrepo-data/
 /**/db.sqlite3
 /**/settings_local.py
+.git/
+.claude/

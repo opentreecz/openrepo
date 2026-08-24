@@ -14,6 +14,8 @@ RUN npm install && \
 # Now build the production image
 FROM ubuntu:24.04
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 RUN apt-get update && apt-get install -y \
       apt-utils \
       createrepo-c \
@@ -22,6 +24,7 @@ RUN apt-get update && apt-get install -y \
       gpg \
       gzip \
       libapt-pkg-dev \
+      libffi-dev \
       libpq-dev \
       python3 \
       python3-pip \

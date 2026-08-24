@@ -17,7 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [amd64, arm64, armhf, i386]
+        include:
+          - arch: amd64
+            platform: linux/amd64
+          - arch: arm64
+            platform: linux/arm64
+          - arch: armhf
+            platform: linux/arm/v7
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +44,7 @@ jobs:
       - name: Build DEB package
         run: |
           docker run --rm \
-            --platform linux/${{ matrix.arch }} \
+            --platform ${{ matrix.platform }} \
             -v ${{ github.workspace }}:/src \
             -w /src \
             -e OPENREPO_VERSION=${{ steps.version.outputs.version }} \
@@ -46,7 +52,7 @@ jobs:
               apt-get update && apt-get install -y \
                 build-essential devscripts debhelper \
                 python3 python3-venv python3-pip \
-                nodejs npm libapt-pkg-dev curl
+                nodejs npm libapt-pkg-dev libffi-dev libpq-dev curl
               
               # Update changelog with version
               sed -i "s/0.0.0-1/${{ steps.version.outputs.version }}-1/" packaging/debian/changelog
