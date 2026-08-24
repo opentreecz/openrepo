@@ -145,6 +145,37 @@ class CopyViewSetTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("identical package already exists", response.data["detail"])
 
+    def test_copy_same_name_version_different_architecture_succeeds(self):
+        """Same package/version can be copied when destination only has a different architecture."""
+        self.pkg.architecture = "amd64"
+        self.pkg.save()
+        Package.objects.create(
+            repo=self.repo_deb2,
+            package_uid="copy-test-pkg-arm64",
+            filename="hello-arm64.deb",
+            package_name="hello",
+            version="1.0",
+            architecture="arm64",
+            upload_date=datetime.datetime.now(tz=datetime.timezone.utc),
+            checksum_sha512="arm64_hash",
+        )
+
+        response = self.client.post(
+            f"/api/{self.repo_deb.repo_uid}/pkg/{self.pkg.package_uid}/copy/",
+            {"dest_repo_uid": self.repo_deb2.repo_uid},
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            Package.objects.filter(
+                repo=self.repo_deb2,
+                package_name="hello",
+                version="1.0",
+                architecture="amd64",
+            ).exists()
+        )
+
 
 class KeepOnlyLatestTestCase(APITestCase):
     """Test keep_only_latest flag behavior during upload and copy."""
@@ -399,6 +430,18 @@ class OverwriteUploadTestCase(APITestCase):
             HTTP_AUTHORIZATION=f"Token {self.admin_token}",
         )
         self.assertEqual(status_response.data["status"], "completed")
+
+    def test_upload_without_package_file_returns_400(self):
+        """Missing package_file is reported as validation error instead of server error."""
+        response = self.client.post(
+            f"/api/{self.repo.repo_uid}/upload/",
+            data={"overwrite": "0"},
+            format="multipart",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("package_file", response.data)
 
 
 class PGPKeyApiTestCase(APITestCase):

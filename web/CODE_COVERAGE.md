@@ -6,10 +6,10 @@
 
 # Code Coverage Report — OpenRepo
 
-> Generated on: 2026-06-17  
+> Generated on: 2026-08-24<br>
 > Test runner: Django test framework  
 > Coverage tool: `coverage.py`  
-> Branch: `feature/code-quality-tests-docs`
+> Branch: `fix/code-quality-docs-release`
 
 ---
 
@@ -22,7 +22,7 @@
 | **Missed statements** | 272 |
 | **Overall coverage** | **85%** |
 | **Total test files** | 10 |
-| **Total test cases** | 84 |
+| **Total test cases** | 88+ |
 
 ---
 
@@ -32,7 +32,7 @@
 cd web
 
 # Run tests and collect coverage
-OPENREPO_DB_TYPE=sqlite coverage run --source=. manage.py test repo.tests
+OPENREPO_VAR_DIR=/tmp/openrepo/ coverage run manage.py test repo.tests --verbosity=2
 
 # View terminal report (skip 100% files)
 coverage report --skip-covered
@@ -42,7 +42,7 @@ coverage html -d htmlcov/
 # Then open: web/htmlcov/index.html
 
 # Single command (run + report)
-OPENREPO_DB_TYPE=sqlite coverage run --source=. manage.py test repo.tests && coverage report
+OPENREPO_VAR_DIR=/tmp/openrepo/ coverage run manage.py test repo.tests --verbosity=2 && coverage report --show-missing
 ```
 
 ---
@@ -141,7 +141,7 @@ OPENREPO_DB_TYPE=sqlite coverage run --source=. manage.py test repo.tests && cov
 
 2. **`adapters/repo/base_repo.py` `setup_repo()` (59%)** — The full end-to-end repo generation path is only reachable with real system tools (`apt-ftparchive`, `createrepo`). Consider an integration test using Docker.
 
-3. **`repo/api/views.py` `UserViewSet` (84%)** — Add tests for user CRUD (list/create/update/delete).
+3. **`repo/api/views.py` `UserViewSet` (84%)** — Add tests for user CRUD (list/create/update/delete). Upload validation and multi-architecture copy edge cases are covered by the API test suite.
 
 4. **`adapters/repo/generic_repo.py` (57%)** — Add a test for `GenericRepoAdapter._generate_repo_structure` with mocked `_copy_packages`.
 

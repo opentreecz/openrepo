@@ -1,6 +1,8 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import unittest
+import os
 import responses
+import tempfile
 from unittest.mock import patch
 from openrepo_cli.rest_interface import RestInterface
 from openrepo_cli.output_formatter import OutputFormatter
@@ -59,6 +61,30 @@ class TestRestInterface(unittest.TestCase):
         sent_body = parse_qs(body)
         self.assertEqual(sent_body["repo_uid"][0], "new-repo")
         self.assertEqual(sent_body["signing_key"][0], "key-fingerprint")
+
+    def test_upload_closes_package_file(self):
+        captured = {}
+
+        def fake_request(endpoint_name, repo=None, package=None, query_args=None, postdata=None, files=None):
+            captured["file"] = files["package_file"]
+            self.assertFalse(captured["file"].closed)
+            self.assertEqual(endpoint_name, "upload")
+            self.assertEqual(repo, "test-repo")
+            self.assertEqual(postdata, {"overwrite": "1"})
+            return {"task_id": "123"}
+
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(b"package")
+            tmp_path = tmp.name
+
+        try:
+            with patch.object(self.interface, "_request", side_effect=fake_request):
+                result = self.interface.upload(tmp_path, "test-repo", True)
+        finally:
+            os.unlink(tmp_path)
+
+        self.assertEqual(result, {"task_id": "123"})
+        self.assertTrue(captured["file"].closed)
 
 
 class TestOutputFormatter(unittest.TestCase):
