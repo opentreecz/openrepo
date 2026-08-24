@@ -12,6 +12,8 @@ nav_order: 1
 
 **OpenRepo** is a self-hosted web server for managing and hosting Debian APT, Red Hat RPM, and generic package repositories.
 
+The current release line emphasizes reliable repository rebuilds, validated uploads, multi-architecture package handling, and continuously published GitHub Pages documentation.
+
 [![CI](https://github.com/opentreecz/openrepo/actions/workflows/main.yml/badge.svg)](https://github.com/opentreecz/openrepo/actions/workflows/main.yml)
 [![Lint](https://github.com/opentreecz/openrepo/actions/workflows/lint.yml/badge.svg)](https://github.com/opentreecz/openrepo/actions/workflows/lint.yml)
 [![Docker](https://github.com/opentreecz/openrepo/actions/workflows/docker-build.yml/badge.svg)](https://github.com/opentreecz/openrepo/actions/workflows/docker-build.yml)
@@ -60,6 +62,27 @@ Default credentials: `admin` / `admin` — **change immediately after first logi
 - [Development](development) — architecture, dev setup, tests, management commands
 - [Bare-Metal Deployment](bare-metal) — systemd, OpenRC, SysVinit, Alpine Linux
 - [OpenWrt Deployment](openwrt) — full server on OpenWrt with procd
+
+---
+
+## Local Quality Checks
+
+```bash
+cd web
+OPENREPO_VAR_DIR=/tmp/openrepo/ coverage run manage.py test repo.tests --verbosity=2
+coverage report --show-missing --fail-under=85
+flake8 --config=.flake8 .
+
+cd ../cli
+PYTHONPATH=. python tests/test_cli.py
+flake8 --config=.flake8 .
+
+cd ../frontend
+npm ci
+npm run type-check
+npm run lint
+npm run build
+```
 
 ---
 

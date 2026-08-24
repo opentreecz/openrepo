@@ -138,12 +138,13 @@ class RestInterface:
         '''
         Upload package files to a repo
         '''
-        files = {'package_file': open(filepath, 'rb')}
         postdata = None
         if overwrite:
             postdata = {'overwrite': '1'}
 
-        return self._request('upload', repo=repo_uid, files=files, postdata=postdata)
+        with open(filepath, 'rb') as package_file:
+            files = {'package_file': package_file}
+            return self._request('upload', repo=repo_uid, files=files, postdata=postdata)
 
     def _request(self, endpoint_name, repo=None, package=None, query_args=None, postdata=None, files=None):
         endpoint = REQUEST_ENDPOINTS[endpoint_name]

@@ -73,12 +73,11 @@ class BackgroundWorker(threading.Thread):
                         logger.info(f"Worker triggering update of repo {next_task_repo_uid}")
 
                         repo = Repository.objects.get(repo_uid=next_task_repo_uid)
-                        repo.is_stale = False
-                        repo.save()
-
-                        # Perform the repo update here
                         adapter = get_repo_adapter(repo)
                         adapter.setup_repo()
+
+                        repo.is_stale = False
+                        repo.save()
                     finally:
                         self._chore_list.cleaning_done(next_task_repo_uid)
 
@@ -127,7 +126,11 @@ class ChoreList:
                     delta_sec = time.time() - self._repo_state[repo_uid]["clean_time_start"]
                     if delta_sec > settings.REPO_CREATE_TIMEOUT_SEC:
                         logger.info(f"Timeout on repo refresh of {repo_uid} after {delta_sec} seconds.  Allowing retry")
-                        del self._repo_state[repo_uid]
+                        self._repo_state[repo_uid] = {
+                            "is_being_cleaned": False,
+                            "clean_time_start": -1,
+                            "insert_time": time.time(),
+                        }
         finally:
             self._lock.release()
 

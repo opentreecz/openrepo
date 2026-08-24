@@ -25,6 +25,8 @@
 
 OpenRepo is a web-based server for managing and hosting repositories containing Debian apt/deb, Red Hat rpm, and generic package files.
 
+The current release line focuses on reliable repository rebuilds, multi-architecture package handling, CI coverage, and GitHub Pages documentation.
+
 The server supports:
 
   - RPM, Deb, and Generic repository generation and hosting compatible with Debian/Ubuntu `apt-get` and Red Hat `yum`/`dnf` tools
@@ -86,6 +88,30 @@ Copy `.env.example` to `.env` and fill in values before starting.
 A common requirement is to automatically upload packages produced by Continuous Integration.  See the [CLI documentation](cli/) for details.
 
 The CLI (or REST API) can push packages to a repo, promote or copy packages between repos, and query repo/package status.
+
+
+## Quality Checks
+
+The project ships with backend, CLI, frontend, lint, coverage, package-build, Docker, and GitHub Pages workflows. To run the most important checks locally:
+
+```bash
+cd web
+OPENREPO_VAR_DIR=/tmp/openrepo/ coverage run manage.py test repo.tests --verbosity=2
+coverage report --show-missing --fail-under=85
+flake8 --config=.flake8 .
+
+cd ../cli
+PYTHONPATH=. python tests/test_cli.py
+flake8 --config=.flake8 .
+
+cd ../frontend
+npm ci
+npm run type-check
+npm run lint
+npm run build
+```
+
+GitHub Pages documentation is built from `docs/` and published at [opentreecz.github.io/openrepo](https://opentreecz.github.io/openrepo/).
 
 
 ## Features

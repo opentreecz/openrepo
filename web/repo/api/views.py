@@ -279,10 +279,14 @@ class CopyViewSet(viewsets.ViewSet):
             package.package_name = package.filename
 
         if Package.objects.filter(
-            repo=dst_repo, package_name=package.package_name, version=package.version
+            repo=dst_repo,
+            package_name=package.package_name,
+            version=package.version,
+            architecture=package.architecture,
         ).count() > 0:
             raise rest_framework.exceptions.ParseError(
-                f"Package {package.package_name} v{package.version} already exists in destination repo {dst_repo}"
+                f"Package {package.package_name} v{package.version} ({package.architecture}) "
+                f"already exists in destination repo {dst_repo}"
             )
 
         if Package.objects.filter(repo=dst_repo, package_uid=package.package_uid):
@@ -314,6 +318,9 @@ class UploadViewSet(viewsets.ViewSet):
         self.check_object_permissions(request, repo)
 
         file_uploaded = request.FILES.get("package_file")
+        if file_uploaded is None:
+            raise rest_framework.exceptions.ValidationError({"package_file": "This field is required."})
+
         overwrite_str = request.POST.get("overwrite", "0").lower()
         overwrite = overwrite_str in ("true", "1", "yes")
         filesize = file_uploaded.size

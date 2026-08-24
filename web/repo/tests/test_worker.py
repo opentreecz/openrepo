@@ -52,9 +52,7 @@ class WorkerTestCase(TestCase):
 
         time.sleep(0.2)
 
-        # Setting needs_clean again should trigger the timeout check and delete the stalled state
-        cl.set_needs_clean(repo_uid)
-        # Now we need to call it again to actually ADD it back to the list
+        # Setting needs_clean again should trigger the timeout check and immediately requeue the task
         cl.set_needs_clean(repo_uid)
 
         # Now it should be available again
@@ -156,3 +154,5 @@ class WorkerTestCase(TestCase):
 
         # cleaning_done() runs in a finally block even though setup_repo() raised
         self.assertIsNone(cl.get_next_task())
+        self.repo.refresh_from_db()
+        self.assertTrue(self.repo.is_stale)
