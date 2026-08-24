@@ -49,23 +49,56 @@ jobs:
             -w /src \
             -e OPENREPO_VERSION=${{ steps.version.outputs.version }} \
             ubuntu:24.04 bash -c '
+              set -euo pipefail
+
+              export DEBIAN_FRONTEND=noninteractive
+
               apt-get update && apt-get install -y \
-                build-essential devscripts debhelper \
+                build-essential \
                 python3 python3-venv python3-pip \
                 nodejs npm libapt-pkg-dev libffi-dev libpq-dev curl
-              
-              # Update changelog with version
-              sed -i "s/0.0.0-1/${{ steps.version.outputs.version }}-1/" packaging/debian/changelog
-              
-              # Copy debian directory to project root
-              cp -r packaging/debian .
-              
-              # Build the package
-              dpkg-buildpackage -us -uc -b
-              
-              # Move artifacts
+
+              rm -rf /tmp/openrepo-deb
+              mkdir -p \
+                /tmp/openrepo-deb/DEBIAN \
+                /tmp/openrepo-deb/opt/openrepo \
+                /tmp/openrepo-deb/lib/systemd/system \
+                /tmp/openrepo-deb/etc/nginx/sites-available \
+                /tmp/openrepo-deb/etc/openrepo \
+                /tmp/openrepo-deb/var/lib/openrepo/storage \
+                /tmp/openrepo-deb/var/lib/openrepo/repos \
+                /tmp/openrepo-deb/var/lib/openrepo/keyring
+
+              cd frontend
+              npm ci
+              npm run build
+              cd /src
+
+              python3 -m venv /tmp/openrepo-deb/opt/openrepo/venv
+              PIP_CONSTRAINT=web/constraints.txt /tmp/openrepo-deb/opt/openrepo/venv/bin/pip install --no-cache-dir -r web/requirements.txt
+
+              cp -r web/* /tmp/openrepo-deb/opt/openrepo/
+              cp -r frontend/dist /tmp/openrepo-deb/opt/openrepo/frontend-dist
+              cp packaging/systemd/openrepo-web.service /tmp/openrepo-deb/lib/systemd/system/
+              cp packaging/systemd/openrepo-worker.service /tmp/openrepo-deb/lib/systemd/system/
+              cp deploy/nginx/nginx.conf.prod /tmp/openrepo-deb/etc/nginx/sites-available/openrepo
+              cp .env.example /tmp/openrepo-deb/etc/openrepo/openrepo.env
+
+              cat > /tmp/openrepo-deb/DEBIAN/control <<EOF
+Package: openrepo
+Version: $OPENREPO_VERSION-1
+Section: web
+Priority: optional
+Architecture: ${{ matrix.arch }}
+Maintainer: opentree.cz <info@opentree.cz>
+Depends: python3 (>= 3.10), python3-venv, nginx, postgresql, createrepo-c, gnupg, libapt-pkg-dev, gunicorn
+Description: Web-based package repository management server
+ OpenRepo is a self-hosted web server for managing and hosting
+ Debian apt/deb, Red Hat rpm, and generic file repositories.
+EOF
+
               mkdir -p /src/dist
-              mv /openrepo_*.deb /src/dist/ 2>/dev/null || mv ../*.deb /src/dist/
+              dpkg-deb --build /tmp/openrepo-deb /src/dist/openrepo_${OPENREPO_VERSION}-1_${{ matrix.arch }}.deb
             '
 
       - name: Upload DEB artifact
@@ -73,13 +106,20 @@ jobs:
         with:
           name: openrepo-deb-${{ matrix.arch }}
           path: dist/*.deb
+          if-no-files-found: error
 
   build-rpm:
     name: Build RPM Package
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [x86_64, aarch64, armv7hl, i686]
+        include:
+          - arch: x86_64
+            platform: linux/amd64
+          - arch: aarch64
+            platform: linux/arm64
+          - arch: armv7hl
+            platform: linux/arm/v7
     steps:
       - uses: actions/checkout@v4
 
@@ -100,12 +140,14 @@ jobs:
       - name: Build RPM package
         run: |
           docker run --rm \
-            --platform linux/${{ matrix.arch == 'x86_64' && 'amd64' || 'arm64' }} \
+            --platform ${{ matrix.platform }} \
             -v ${{ github.workspace }}:/src \
             -w /src \
             -e VERSION=${{ steps.version.outputs.version }} \
             fedora:40 bash -c '
-              dnf install -y rpm-build rpmdevtools python3-devel nodejs npm createrepo_c
+              set -euo pipefail
+
+              dnf install -y rpm-build rpmdevtools git python3-devel libffi-devel postgresql-devel apt-devel nodejs npm createrepo_c
 
               # Set up rpmbuild directory
               rpmdev-setuptree
@@ -121,6 +163,7 @@ jobs:
               # Move artifacts
               mkdir -p /src/dist
               find ~/rpmbuild/RPMS -name "*.rpm" -exec cp {} /src/dist/ \;
+              test -n "$(find /src/dist -name "*.rpm" -print -quit)"
             '
 
       - name: Upload RPM artifact
@@ -128,6 +171,7 @@ jobs:
         with:
           name: openrepo-rpm-${{ matrix.arch }}
           path: dist/*.rpm
+          if-no-files-found: error
 
   release:
     name: Attach to Release

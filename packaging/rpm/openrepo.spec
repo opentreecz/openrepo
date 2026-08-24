@@ -7,8 +7,11 @@ License:        AGPL-3.0-only
 URL:            https://github.com/opentreecz/openrepo
 Source0:        %{name}-%{version}.tar.gz
 
-BuildArch:      noarch
 BuildRequires:  python3-devel
+BuildRequires:  git
+BuildRequires:  libffi-devel
+BuildRequires:  postgresql-devel
+BuildRequires:  apt-devel
 BuildRequires:  nodejs >= 20
 BuildRequires:  npm
 
