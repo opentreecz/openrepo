@@ -384,6 +384,26 @@ OpenRepo handles multiple CPU architectures in a single repository:
 
 Having the same package name and version for different architectures (e.g., `myapp_1.0_amd64.deb` and `myapp_1.0_arm64.deb`) in the same repository is **correct and standard practice** for both Debian and RPM ecosystems.
 
+## Companion Tools
+
+### openrepo-sync
+
+[openrepo-sync](https://github.com/opentreecz/openrepo-sync) is an automated package synchronization tool that keeps your OpenRepo repository up to date with upstream sources. It:
+
+- Fetches packages from GitHub Releases, Debian APT repos, RPM (YUM/DNF) repos, SourceForge, and direct URLs
+- Uploads new versions to OpenRepo via the REST API
+- Prunes old versions beyond a configurable retention limit
+- Verifies package metadata version matches source-reported version
+- Runs as a one-shot CLI tool or a scheduled Docker container
+
+```sh
+# Quick start with Docker
+docker pull ghcr.io/opentreecz/openrepo-sync:latest
+docker compose up -d   # scheduled sync every 24h
+```
+
+Documentation: [opentreecz.github.io/openrepo-sync](https://opentreecz.github.io/openrepo-sync/)
+
 ## Contributing
 
 We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:

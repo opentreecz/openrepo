@@ -106,3 +106,39 @@ To add a user:
 - [Bare-Metal Deployment](bare-metal) — install on Debian/Ubuntu, RHEL/Fedora, Arch Linux, Alpine Linux with systemd/OpenRC/SysVinit
 - [OpenWrt Deployment](openwrt) — full server on OpenWrt with procd init and pure-Python tools
 - [Multi-Architecture Guide](architecture-guide) — how to host packages for multiple CPU architectures in one repository
+
+---
+
+## Automated Sync with openrepo-sync
+
+Once your repository is set up, you can use [openrepo-sync](https://github.com/opentreecz/openrepo-sync) to automatically mirror packages from upstream sources (GitHub Releases, Debian APT repos, RPM repos, SourceForge, direct URLs).
+
+```sh
+# Install and configure
+docker pull ghcr.io/opentreecz/openrepo-sync:latest
+
+# Create config pointing to your OpenRepo server
+cat > config.yaml <<EOF
+openrepo:
+  api_url: "https://your-openrepo-server.com"
+  api_key: "${OPENREPO_API_KEY}"
+EOF
+
+# Create a project file
+cat > projects/nginx.yaml <<EOF
+name: nginx
+repo_uid: deb
+keep_versions: 3
+source:
+  type: deb_repo
+  url: https://nginx.org/packages/debian
+  suites: bookworm
+  package_filter: nginx
+EOF
+
+# Run sync
+docker compose run --rm openrepo-sync --dry-run
+docker compose run --rm openrepo-sync
+```
+
+Full documentation: [opentreecz.github.io/openrepo-sync](https://opentreecz.github.io/openrepo-sync/)
