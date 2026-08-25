@@ -94,13 +94,13 @@
                             ></v-text-field>
                         </v-col>
                     </v-layout>
-                    <v-layout row wrap v-if="this.repo_details.repo_type === 'deb'">
+                    <v-layout row wrap v-if="this.repo_details.repo_type === 'deb' || this.repo_details.repo_type === 'rpm'">
                         <v-col cols="12" class="py-0 my-0">
                             <v-checkbox
                                 v-model="this.repo_details.multi_arch"
                                 :disabled="form_disabled"
                                 :error-messages="repo_error_response.multi_arch"
-                                label="Multi-architecture support (generate per-arch binary dirs instead of binary-any/)"
+                                label="Multi-architecture support (generate per-architecture directories)"
                                 ></v-checkbox>
                         </v-col>
                     </v-layout>

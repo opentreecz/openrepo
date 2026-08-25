@@ -52,12 +52,12 @@
                 </v-col>
                 </v-row>
 
-                <v-row v-if="repo.repo_type === 'deb'">
+                <v-row v-if="repo.repo_type === 'deb' || repo.repo_type === 'rpm'">
                     <v-col cols="12" class="py-0 my-0">
                         <v-checkbox
                             v-model="repo.multi_arch"
-                            label="Multi-architecture support (generate per-arch binary dirs instead of binary-any/)"
-                            hint="Recommended for repositories serving multiple platforms (amd64, arm64, armhf, etc.)"
+                            label="Multi-architecture support (generate per-architecture directories)"
+                            hint="Recommended for repositories serving multiple platforms (amd64, arm64, armhf, x86_64, aarch64, etc.)"
                             persistent-hint
                             density="compact"
                         ></v-checkbox>
@@ -162,7 +162,7 @@
                 repo_uid: this.repo.repo_uid,
                 repo_type: this.repo.repo_type,
                 signing_key: this.repo.signing_key,
-                multi_arch: this.repo.repo_type === 'deb' ? this.repo.multi_arch : false
+                multi_arch: (this.repo.repo_type === 'deb' || this.repo.repo_type === 'rpm') ? this.repo.multi_arch : false
             };
 
             RepoDataService.create(data)

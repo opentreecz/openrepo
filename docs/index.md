@@ -29,7 +29,7 @@ OpenRepo lets you host your own package repositories for Linux systems — witho
 | Feature | Description |
 |---|---|
 | **Deb / RPM / Generic** | Host all three repo types from one server |
-| **Multi-arch Debian** | Per-architecture `binary-amd64/`, `binary-arm64/` dirs with proper `arch=all` handling |
+| **Multi-arch Debian & RPM** | Per-architecture directories with proper `noarch`/`all` handling, `$basearch` support |
 | **Package retention** | Auto-prune old versions by count, age, or both |
 | **PGP signing** | Repo-level signing with 4096-bit RSA keys, generated or imported |
 | **Promotion chains** | One-click promotion across dev → staging → production |

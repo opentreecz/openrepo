@@ -20,9 +20,11 @@ nav_order: 3
 
 ---
 
-## Multi-architecture Debian repositories
+## Multi-architecture repositories
 
-By default, Debian repos use `binary-any/` (works for all packages). Enable **multi-arch** mode per repo in Repo Settings to generate proper per-architecture directories.
+Both Debian and RPM repositories support multi-architecture mode. Enable **multi-arch** per repo in Repo Settings to generate per-architecture directories.
+
+### Debian (.deb) multi-arch
 
 **When enabled:**
 
@@ -31,6 +33,18 @@ By default, Debian repos use `binary-any/` (works for all packages). Enable **mu
 - Setup instructions automatically reflect detected architectures: `deb [arch=amd64,arm64 signed-by=...] ...`
 - Falls back to `binary-amd64/` when no packages are uploaded yet
 - Existing repos default to `binary-any/` — **opt in per-repo** to avoid breaking existing clients
+
+### RPM (.rpm) multi-arch
+
+**When enabled:**
+
+- Per-architecture subdirectories are created: `x86_64/`, `aarch64/`, etc.
+- `noarch` packages are symlinked into **every** architecture directory (same pattern as Debian's `all`)
+- Each architecture directory gets its own `repodata/` metadata
+- Setup instructions use `$basearch` variable: `baseurl=http://host/repo/$basearch/`
+- DNF/YUM automatically resolves `$basearch` to the client's architecture
+- Falls back to `x86_64/` when no packages are uploaded yet
+- Existing repos default to flat mode — **opt in per-repo** to avoid breaking existing clients
 
 **To enable:** Repo Settings → check *Multi-architecture support*
 

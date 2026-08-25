@@ -163,7 +163,7 @@ def generate_packages_file(pool_dir, output_dir, arch=None):
     return len(entries)
 
 
-def generate_rpm_repodata(repo_dir):
+def generate_rpm_repodata(repo_dir, arch=None):
     """
     Generate RPM repository metadata (repomd.xml, primary.xml.gz).
 
@@ -172,6 +172,8 @@ def generate_rpm_repodata(repo_dir):
 
     Args:
         repo_dir: Directory containing .rpm files
+        arch: If specified, only include RPMs matching this architecture
+              (plus 'noarch' packages, which are included in every arch index)
     """
     try:
         import rpmfile
@@ -196,15 +198,19 @@ def generate_rpm_repodata(repo_dir):
                 name = rpm.headers.get("name", b"").decode("utf-8", errors="replace")
                 version = rpm.headers.get("version", b"").decode("utf-8", errors="replace")
                 release = rpm.headers.get("release", b"").decode("utf-8", errors="replace")
-                arch = rpm.headers.get("arch", b"").decode("utf-8", errors="replace")
+                pkg_arch = rpm.headers.get("arch", b"").decode("utf-8", errors="replace")
                 summary = rpm.headers.get("summary", b"").decode("utf-8", errors="replace")
+
+            # Filter by architecture if specified (include matching arch + noarch)
+            if arch and pkg_arch and pkg_arch != "noarch" and pkg_arch != arch:
+                continue
 
             hashes = _compute_hashes(filepath)
             packages.append({
                 "name": name,
                 "version": version,
                 "release": release,
-                "arch": arch,
+                "arch": pkg_arch,
                 "summary": summary,
                 "filename": filename,
                 "size": hashes["size"],

@@ -118,8 +118,8 @@ class MultiArchRepoCreationTest(APITestCase):
         repo = Repository.objects.get(repo_uid="test-deb-legacy")
         self.assertFalse(repo.multi_arch)
 
-    def test_create_rpm_repo_multi_arch_not_applied(self):
-        """RPM repos should not have multi_arch set to True."""
+    def test_create_rpm_repo_defaults_multi_arch_true(self):
+        """New RPM repos should default to multi_arch=True."""
         response = self.client.post(
             "/api/repos/",
             {
@@ -132,6 +132,23 @@ class MultiArchRepoCreationTest(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         repo = Repository.objects.get(repo_uid="test-rpm")
+        self.assertTrue(repo.multi_arch)
+
+    def test_create_rpm_repo_explicit_multi_arch_false(self):
+        """Can explicitly create an RPM repo with multi_arch=False."""
+        response = self.client.post(
+            "/api/repos/",
+            {
+                "repo_uid": "test-rpm-legacy",
+                "repo_type": "rpm",
+                "signing_key": "A" * 40,
+                "multi_arch": False,
+            },
+            HTTP_AUTHORIZATION=self.auth,
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        repo = Repository.objects.get(repo_uid="test-rpm-legacy")
         self.assertFalse(repo.multi_arch)
 
 
@@ -491,3 +508,118 @@ class MultiArchRetentionTest(APITestCase):
 
         # arm64 v1.0 should still be kept (it's the only one)
         self.assertTrue(Package.objects.filter(pk=pkg3.pk).exists())
+
+
+class RpmMultiArchRepoTest(APITestCase):
+    """Test RPM multi-architecture repository generation."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="rpm-arch-admin", password="p")
+        self.token = Token.objects.get(user=self.admin).key
+        self.auth = f"Token {self.token}"
+        self.signing_key = PGPSigningKey.objects.create(
+            name="Test Key",
+            email="test@test.com",
+            fingerprint="F" * 40,
+            public_key_pem="pub",
+            private_key_pem="priv",
+        )
+
+    def test_rpm_multi_arch_instructions_contain_basearch(self):
+        """RPM multi_arch repo instructions should use $basearch in baseurl."""
+        repo = Repository.objects.create(
+            repo_uid="rpm-multi",
+            repo_type="rpm",
+            signing_key=self.signing_key,
+            multi_arch=True,
+        )
+        from adapters.repo import get_repo_adapter
+        adapter = get_repo_adapter(repo)
+        instructions = adapter._get_repo_instructions()
+        self.assertIn("$basearch", instructions)
+
+    def test_rpm_legacy_instructions_no_basearch(self):
+        """RPM legacy mode instructions should NOT use $basearch."""
+        repo = Repository.objects.create(
+            repo_uid="rpm-legacy",
+            repo_type="rpm",
+            signing_key=self.signing_key,
+            multi_arch=False,
+        )
+        from adapters.repo import get_repo_adapter
+        adapter = get_repo_adapter(repo)
+        instructions = adapter._get_repo_instructions()
+        self.assertNotIn("$basearch", instructions)
+
+    def test_rpm_get_architectures_multi_arch(self):
+        """_get_architectures() should return distinct arches (excl noarch) when multi_arch=True."""
+        repo = Repository.objects.create(
+            repo_uid="rpm-arches",
+            repo_type="rpm",
+            signing_key=self.signing_key,
+            multi_arch=True,
+        )
+        now = datetime.now(tz=timezone.utc)
+        Package.objects.create(
+            package_uid="rr-x86",
+            repo=repo,
+            filename="app-1.0-1.x86_64.rpm",
+            package_name="app",
+            architecture="x86_64",
+            version="1.0",
+            upload_date=now,
+            checksum_sha512="x1",
+        )
+        Package.objects.create(
+            package_uid="rr-aarch",
+            repo=repo,
+            filename="app-1.0-1.aarch64.rpm",
+            package_name="app",
+            architecture="aarch64",
+            version="1.0",
+            upload_date=now,
+            checksum_sha512="x2",
+        )
+        Package.objects.create(
+            package_uid="rr-noarch",
+            repo=repo,
+            filename="common-1.0-1.noarch.rpm",
+            package_name="common",
+            architecture="noarch",
+            version="1.0",
+            upload_date=now,
+            checksum_sha512="x3",
+        )
+
+        from adapters.repo import get_repo_adapter
+        adapter = get_repo_adapter(repo)
+        arches = adapter._get_architectures()
+        self.assertEqual(arches, ["aarch64", "x86_64"])
+        self.assertNotIn("noarch", arches)
+
+    def test_rpm_get_architectures_legacy_returns_none(self):
+        """_get_architectures() should return None when multi_arch=False."""
+        repo = Repository.objects.create(
+            repo_uid="rpm-legacy-arch",
+            repo_type="rpm",
+            signing_key=self.signing_key,
+            multi_arch=False,
+        )
+        from adapters.repo import get_repo_adapter
+        adapter = get_repo_adapter(repo)
+        arches = adapter._get_architectures()
+        self.assertIsNone(arches)
+
+    def test_rpm_get_architectures_empty_repo_defaults(self):
+        """Empty multi_arch RPM repo should fallback to [x86_64]."""
+        repo = Repository.objects.create(
+            repo_uid="rpm-empty-arch",
+            repo_type="rpm",
+            signing_key=self.signing_key,
+            multi_arch=True,
+        )
+        from adapters.repo import get_repo_adapter
+        adapter = get_repo_adapter(repo)
+        arches = adapter._get_architectures()
+        self.assertEqual(arches, ["x86_64"])
