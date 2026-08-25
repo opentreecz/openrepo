@@ -7,11 +7,18 @@ License:        AGPL-3.0-only
 URL:            https://github.com/opentreecz/openrepo
 Source0:        %{name}-%{version}.tar.gz
 
+%{!?_unitdir:%global _unitdir /usr/lib/systemd/system}
+%global debug_package %{nil}
+
 BuildRequires:  python3-devel
 BuildRequires:  git
+BuildRequires:  gcc-c++
+BuildRequires:  dpkg-dev
+BuildRequires:  python3-distutils-extra
 BuildRequires:  libffi-devel
-BuildRequires:  postgresql-devel
+BuildRequires:  libpq-devel
 BuildRequires:  apt-devel
+BuildRequires:  systemd-rpm-macros
 BuildRequires:  nodejs >= 20
 BuildRequires:  npm
 
@@ -47,6 +54,7 @@ PIP_CONSTRAINT=web/constraints.txt %{buildroot}/opt/openrepo/venv/bin/pip instal
 # Install application
 install -d %{buildroot}/opt/openrepo
 cp -r web/* %{buildroot}/opt/openrepo/
+sed -i '1s|/usr/bin/env python$|/usr/bin/env python3|' %{buildroot}/opt/openrepo/manage.py
 cp -r frontend/dist %{buildroot}/opt/openrepo/frontend-dist
 
 # Install systemd service files

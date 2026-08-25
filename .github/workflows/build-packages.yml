@@ -16,6 +16,7 @@ jobs:
     name: Build DEB Package
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: amd64
@@ -55,7 +56,7 @@ jobs:
 
               apt-get update && apt-get install -y \
                 build-essential \
-                python3 python3-venv python3-pip \
+                python3 python3-venv python3-pip python3-dev python3-distutils-extra \
                 nodejs npm libapt-pkg-dev libffi-dev libpq-dev curl
 
               rm -rf /tmp/openrepo-deb
@@ -84,7 +85,7 @@ jobs:
               cp deploy/nginx/nginx.conf.prod /tmp/openrepo-deb/etc/nginx/sites-available/openrepo
               cp .env.example /tmp/openrepo-deb/etc/openrepo/openrepo.env
 
-              printf '%s\n' \
+              printf "%s\n" \
                 "Package: openrepo" \
                 "Version: $OPENREPO_VERSION-1" \
                 "Section: web" \
@@ -112,14 +113,13 @@ jobs:
     name: Build RPM Package
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - arch: x86_64
             platform: linux/amd64
           - arch: aarch64
             platform: linux/arm64
-          - arch: armv7hl
-            platform: linux/arm/v7
     steps:
       - uses: actions/checkout@v4
 
@@ -147,7 +147,7 @@ jobs:
             fedora:40 bash -c '
               set -euo pipefail
 
-              dnf install -y rpm-build rpmdevtools git python3-devel libffi-devel postgresql-devel apt-devel nodejs npm createrepo_c
+              dnf install -y rpm-build rpmdevtools git gcc-c++ dpkg-dev python3-distutils-extra python3-devel libffi-devel libpq-devel apt-devel systemd-rpm-macros nodejs npm createrepo_c
 
               # Set up rpmbuild directory
               rpmdev-setuptree
