@@ -39,7 +39,7 @@ jobs:
 
       - name: Set up QEMU
         if: matrix.arch != 'amd64'
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Build DEB package
         run: |
@@ -85,16 +85,16 @@ jobs:
               cp .env.example /tmp/openrepo-deb/etc/openrepo/openrepo.env
 
               printf '%s\n' \
-                'Package: openrepo' \
+                "Package: openrepo" \
                 "Version: $OPENREPO_VERSION-1" \
-                'Section: web' \
-                'Priority: optional' \
-                'Architecture: ${{ matrix.arch }}' \
-                'Maintainer: opentree.cz <info@opentree.cz>' \
-                'Depends: python3 (>= 3.10), python3-venv, nginx, postgresql, createrepo-c, gnupg, libapt-pkg-dev, gunicorn' \
-                'Description: Web-based package repository management server' \
-                ' OpenRepo is a self-hosted web server for managing and hosting' \
-                ' Debian apt/deb, Red Hat rpm, and generic file repositories.' \
+                "Section: web" \
+                "Priority: optional" \
+                "Architecture: ${{ matrix.arch }}" \
+                "Maintainer: opentree.cz <info@opentree.cz>" \
+                "Depends: python3 (>= 3.10), python3-venv, nginx, postgresql, createrepo-c, gnupg, libapt-pkg-dev, gunicorn" \
+                "Description: Web-based package repository management server" \
+                " OpenRepo is a self-hosted web server for managing and hosting" \
+                " Debian apt/deb, Red Hat rpm, and generic file repositories." \
                 > /tmp/openrepo-deb/DEBIAN/control
 
               mkdir -p /src/dist
@@ -135,7 +135,7 @@ jobs:
 
       - name: Set up QEMU
         if: matrix.arch != 'x86_64'
-        uses: docker/setup-qemu-action@v3
+        uses: docker/setup-qemu-action@v4
 
       - name: Build RPM package
         run: |
