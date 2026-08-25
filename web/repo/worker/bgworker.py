@@ -13,6 +13,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import logging
+import signal
 import threading
 import time
 
@@ -29,15 +30,61 @@ logger = logging.getLogger("openrepo_web")
 class BackgroundWorker(threading.Thread):
 
     RETENTION_SWEEP_INTERVAL_SEC = 86400  # 24 hours
+    FAILURE_BACKOFF_SEC = 60  # Skip a repo for 60s after repeated failures
+    MAX_CONSECUTIVE_FAILURES = 3  # Number of failures before applying backoff
 
     def __init__(self, chore_list):
         self.stay_alive = True
         self._chore_list = chore_list
         self._last_retention_sweep = 0
+        self._failure_counts = {}  # {repo_uid: {"count": int, "backoff_until": float}}
         threading.Thread.__init__(self)
 
     def stop(self):
         self.stay_alive = False
+
+    def _setup_signal_handlers(self):
+        """Register signal handlers for graceful shutdown (SIGTERM, SIGINT)."""
+        def _handle_signal(signum, frame):
+            sig_name = signal.Signals(signum).name
+            logger.info(f"Received {sig_name}, initiating graceful shutdown...")
+            self.stay_alive = False
+
+        try:
+            signal.signal(signal.SIGTERM, _handle_signal)
+            signal.signal(signal.SIGINT, _handle_signal)
+        except (ValueError, OSError):
+            # Signal handling can only be set in the main thread.
+            # If this is not the main thread, skip (e.g., during testing).
+            pass
+
+    def _should_skip_repo(self, repo_uid):
+        """Check if a repo should be skipped due to failure backoff."""
+        if repo_uid not in self._failure_counts:
+            return False
+        entry = self._failure_counts[repo_uid]
+        if entry["count"] >= self.MAX_CONSECUTIVE_FAILURES:
+            if time.time() < entry["backoff_until"]:
+                return True
+            # Backoff expired — allow retry
+            del self._failure_counts[repo_uid]
+        return False
+
+    def _record_failure(self, repo_uid):
+        """Record a failure for a repo and apply backoff if threshold reached."""
+        if repo_uid not in self._failure_counts:
+            self._failure_counts[repo_uid] = {"count": 0, "backoff_until": 0}
+        self._failure_counts[repo_uid]["count"] += 1
+        if self._failure_counts[repo_uid]["count"] >= self.MAX_CONSECUTIVE_FAILURES:
+            self._failure_counts[repo_uid]["backoff_until"] = time.time() + self.FAILURE_BACKOFF_SEC
+            logger.warning(
+                f"Repo '{repo_uid}' has failed {self.MAX_CONSECUTIVE_FAILURES} times consecutively. "
+                f"Backing off for {self.FAILURE_BACKOFF_SEC}s."
+            )
+
+    def _record_success(self, repo_uid):
+        """Clear failure count on success."""
+        self._failure_counts.pop(repo_uid, None)
 
     def _run_retention_sweep(self):
         """Apply retention policies across all repos that have a non-none policy."""
@@ -54,6 +101,7 @@ class BackgroundWorker(threading.Thread):
                 logger.exception(f"Retention sweep failed for repo {repo.repo_uid}")
 
     def run(self):
+        self._setup_signal_handlers()
         logger.info(f"Starting bg worker thread {threading.current_thread().ident}")
         next_task_repo_uid = ""
 
@@ -65,9 +113,19 @@ class BackgroundWorker(threading.Thread):
                     self._run_retention_sweep()
                     self._last_retention_sweep = time.time()
 
+                # Close stale DB connections before accessing the database
+                close_old_connections()
+
                 next_task_repo_uid = self._chore_list.get_next_task()
 
                 if next_task_repo_uid is not None:
+
+                    # Check if this repo is in backoff due to repeated failures
+                    if self._should_skip_repo(next_task_repo_uid):
+                        logger.debug(f"Skipping repo '{next_task_repo_uid}' (in backoff)")
+                        self._chore_list.cleaning_done(next_task_repo_uid)
+                        time.sleep(1.0)
+                        continue
 
                     try:
                         logger.info(f"Worker triggering update of repo {next_task_repo_uid}")
@@ -78,12 +136,22 @@ class BackgroundWorker(threading.Thread):
 
                         repo.is_stale = False
                         repo.save()
+                        self._record_success(next_task_repo_uid)
+
+                    except Repository.DoesNotExist:
+                        logger.info(
+                            f"Repo '{next_task_repo_uid}' was deleted before worker could process it. Skipping."
+                        )
                     finally:
                         self._chore_list.cleaning_done(next_task_repo_uid)
 
             except Exception:
                 logger.exception(f"Unhandled exception while processing repo {next_task_repo_uid}")
+                if next_task_repo_uid:
+                    self._record_failure(next_task_repo_uid)
             time.sleep(1.0)
+
+        logger.info("Background worker shutting down gracefully.")
 
 
 class ChoreList:
@@ -152,6 +220,9 @@ class ChoreList:
     def cleaning_done(self, repo_uid):
         try:
             self._lock.acquire()
-            del self._repo_state[repo_uid]
+            if repo_uid in self._repo_state:
+                del self._repo_state[repo_uid]
+            else:
+                logger.warning(f"cleaning_done called for unknown repo_uid '{repo_uid}' — ignoring")
         finally:
             self._lock.release()

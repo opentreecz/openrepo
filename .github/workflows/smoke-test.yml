@@ -52,7 +52,7 @@ jobs:
           fi
           echo "Health endpoint OK: $response"
 
-      - name: Test API endpoint
+      - name: Test API endpoint (unauthenticated)
         run: |
           response=$(curl -sf http://localhost:7376/api/repos/ || echo "FAILED")
           if [ "$response" = "FAILED" ]; then
@@ -71,7 +71,7 @@ jobs:
           fi
           echo "Frontend loads OK (HTTP 200)"
 
-      - name: Test API authentication
+      - name: Test authentication enforcement
         run: |
           # Attempt to create a repo without auth (should fail with 401/403)
           response=$(curl -sf -o /dev/null -w "%{http_code}" -X POST \
@@ -83,6 +83,152 @@ jobs:
             exit 1
           fi
           echo "Authentication enforced (HTTP $response)"
+
+      - name: Get admin API token
+        id: auth
+        run: |
+          # Get admin token via Django management command
+          TOKEN=$(docker compose exec -T django python manage.py shell -c "
+          from rest_framework.authtoken.models import Token
+          from django.contrib.auth.models import User
+          user = User.objects.get(username='admin')
+          token, _ = Token.objects.get_or_create(user=user)
+          print(token.key)
+          " 2>/dev/null | tail -1)
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+          echo "Got admin API token"
+
+      - name: Create signing key
+        id: key
+        run: |
+          response=$(curl -sf -X POST \
+            -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
+            -d "name=Smoke Test&email=smoke@test.com" \
+            http://localhost:7376/api/signingkeys/)
+          echo "Signing key created"
+          # Fetch the key fingerprint
+          FINGERPRINT=$(curl -sf \
+            -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
+            http://localhost:7376/api/signingkeys/ | jq -r '.results[0].fingerprint')
+          echo "fingerprint=$FINGERPRINT" >> "$GITHUB_OUTPUT"
+          echo "Fingerprint: $FINGERPRINT"
+
+      - name: Create repository (authenticated)
+        run: |
+          response=$(curl -sf -X POST \
+            -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
+            -H "Content-Type: application/json" \
+            -d "{\"repo_uid\":\"smoke-test-repo\",\"repo_type\":\"deb\",\"signing_key\":\"${{ steps.key.outputs.fingerprint }}\",\"multi_arch\":true}" \
+            http://localhost:7376/api/repos/)
+          echo "Repo created: $response"
+          REPO_UID=$(echo "$response" | jq -r '.repo_uid')
+          if [ "$REPO_UID" != "smoke-test-repo" ]; then
+            echo "::error::Repo creation failed"
+            exit 1
+          fi
+
+      - name: Upload test package
+        id: upload
+        run: |
+          # Create a minimal test .deb file
+          mkdir -p /tmp/testpkg/DEBIAN
+          cat > /tmp/testpkg/DEBIAN/control << 'EOF'
+          Package: smoke-test
+          Version: 1.0.0
+          Architecture: amd64
+          Maintainer: test@test.com
+          Description: Smoke test package
+          EOF
+          dpkg-deb --build /tmp/testpkg /tmp/smoke-test_1.0.0_amd64.deb 2>/dev/null || \
+            ar r /tmp/smoke-test_1.0.0_amd64.deb
+
+          # Upload the package
+          response=$(curl -sf -X POST \
+            -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
+            -F "package_file=@/tmp/smoke-test_1.0.0_amd64.deb" \
+            http://localhost:7376/api/smoke-test-repo/upload/)
+          TASK_ID=$(echo "$response" | jq -r '.task_id')
+          echo "task_id=$TASK_ID" >> "$GITHUB_OUTPUT"
+          echo "Upload initiated, task_id: $TASK_ID"
+
+      - name: Poll upload status
+        run: |
+          TASK_ID="${{ steps.upload.outputs.task_id }}"
+          for i in $(seq 1 30); do
+            response=$(curl -sf \
+              -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
+              http://localhost:7376/api/upload-status/$TASK_ID/)
+            STATUS=$(echo "$response" | jq -r '.status')
+            echo "Poll $i: status=$STATUS"
+            if [ "$STATUS" = "completed" ]; then
+              echo "Upload completed successfully"
+              exit 0
+            elif [ "$STATUS" = "failed" ]; then
+              echo "::error::Upload failed: $(echo $response | jq -r '.error_message')"
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "::error::Upload status poll timed out"
+          exit 1
+
+      - name: List packages (verify upload)
+        run: |
+          response=$(curl -sf \
+            -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
+            http://localhost:7376/api/smoke-test-repo/packages/)
+          COUNT=$(echo "$response" | jq -r '.count')
+          echo "Package count: $COUNT"
+          if [ "$COUNT" -lt 1 ]; then
+            echo "::error::Expected at least 1 package after upload"
+            exit 1
+          fi
+          echo "Package listing verified"
+
+      - name: Verify worker is running
+        run: |
+          WORKER_PID=$(docker compose exec -T worker pgrep -f "manage.py runworker" || true)
+          if [ -z "$WORKER_PID" ]; then
+            echo "::error::Background worker process not found"
+            docker compose logs worker
+            exit 1
+          fi
+          echo "Worker is running (PID: $WORKER_PID)"
+
+      - name: Test signing key listing
+        run: |
+          response=$(curl -sf \
+            -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
+            http://localhost:7376/api/signingkeys/)
+          COUNT=$(echo "$response" | jq -r '.results | length')
+          if [ "$COUNT" -lt 1 ]; then
+            echo "::error::Expected at least 1 signing key"
+            exit 1
+          fi
+          echo "Signing keys: $COUNT"
+
+      - name: Test whoami endpoint
+        run: |
+          response=$(curl -sf \
+            -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
+            http://localhost:7376/api/whoami)
+          USERNAME=$(echo "$response" | jq -r '.username')
+          if [ "$USERNAME" != "admin" ]; then
+            echo "::error::Expected username 'admin', got '$USERNAME'"
+            exit 1
+          fi
+          echo "Whoami OK: $USERNAME"
+
+      - name: Delete repository
+        run: |
+          response=$(curl -sf -o /dev/null -w "%{http_code}" -X DELETE \
+            -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
+            http://localhost:7376/api/smoke-test-repo/)
+          if [ "$response" != "204" ]; then
+            echo "::error::Repo deletion returned HTTP $response (expected 204)"
+            exit 1
+          fi
+          echo "Repo deleted OK (HTTP 204)"
 
       - name: Cleanup
         if: always()
