@@ -23,8 +23,6 @@ jobs:
             platform: linux/amd64
           - arch: arm64
             platform: linux/arm64
-          - arch: armhf
-            platform: linux/arm/v7
     steps:
       - uses: actions/checkout@v4
 
