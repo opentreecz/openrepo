@@ -24,7 +24,7 @@ nav_order: 5
 
 **Binary (recommended):**
 ```bash
-sudo wget https://github.com/opentreecz/openrepo/releases/download/v1.0.0/openrepo_cli_$(uname -m) \
+sudo wget https://github.com/opentreecz/openrepo/releases/latest/download/openrepo_cli_$(uname -m) \
   -O /usr/local/bin/openrepo && sudo chmod +x /usr/local/bin/openrepo
 ```
 
@@ -70,6 +70,7 @@ Find your API key at **User Info** → `/cfg/userinfo/` on the server.
 openrepo list_repos
 openrepo repo_details     --repo_uid <uid>
 openrepo repo_create      --repo_uid <uid> --repo_type <deb|rpm|files> --signing_key <fingerprint>
+openrepo repo_update      --repo_uid <uid> [--signing_key <fp>] [--retention_policy <policy>] [--multi_arch true|false] [--promote_to <uid>]
 openrepo repo_delete      --repo_uid <uid>
 ```
 
@@ -78,16 +79,27 @@ openrepo repo_delete      --repo_uid <uid>
 ```bash
 openrepo list_packages    --repo_uid <uid>
 openrepo package_detail   --repo_uid <uid> --package_uid <uid>
-openrepo upload           --repo_uid <uid> [--overwrite] <file> [<file> ...]
+openrepo upload           -r <uid> [-o] [--no-wait] <file> [<file> ...]
 openrepo package_copy     --src_repo_uid <uid> --src_package_uid <uid> --dst_repo_uid <uid>
 openrepo package_promote  --src_repo_uid <uid> --src_package_uid <uid>
 openrepo package_delete   --repo_uid <uid> --package_uid <uid>
 ```
 
+The `upload` command now polls for completion by default. Use `--no-wait` to fire-and-forget (returns the `task_id` immediately without waiting).
+
 ### Signing key commands
 
 ```bash
 openrepo list_signingkeys
+openrepo create_signingkey --name <name> --email <email>
+openrepo delete_signingkey --fingerprint <fingerprint>
+openrepo download_signingkey --fingerprint <fingerprint>
+```
+
+### User commands
+
+```bash
+openrepo whoami
 ```
 
 ---

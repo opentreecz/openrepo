@@ -71,6 +71,11 @@ def main():
         "-o", "--overwrite", action='store_true', help="Overwrite existing package if it already exists"
     )
 
+    subparser_upload.add_argument(
+        "--no-wait", action='store_true', dest='no_wait',
+        help="Don't wait for upload processing to complete (fire-and-forget)"
+    )
+
     subparser_upload.add_argument("filepath", help="path of file(s) to upload", nargs='+',
                                   type=str)
 
@@ -99,6 +104,7 @@ def main():
         response_content = ''
         if args.command == 'upload':
             count = 0
+            wait = not args.no_wait
             for filepath in args.filepath:
                 count += 1
                 logger.debug(f"Uploading file {filepath} ({count} of {len(args.filepath)})")
@@ -106,7 +112,10 @@ def main():
                 if not Path(filepath).is_file():
                     logger.warning(f"File does not exist {filepath}")
                     continue
-                response_content = interface.upload(repo_uid=args.repo_uid, filepath=filepath, overwrite=args.overwrite)
+                response_content = interface.upload(
+                    repo_uid=args.repo_uid, filepath=filepath,
+                    overwrite=args.overwrite, wait=wait
+                )
 
         else:
             # CLI args were auto generated from rest_interface function names

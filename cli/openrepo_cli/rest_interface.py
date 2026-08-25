@@ -16,6 +16,7 @@ import requests
 from .errors import ORNon200ResponseException, ORConnectionException, ORUnauthorizedException, ORInvalidRequestException
 import json
 import logging
+import time
 
 logger = logging.getLogger('openrepo_cli')
 
@@ -26,11 +27,17 @@ REQUEST_ENDPOINTS = {
     'list_signingkeys': ('GET', '/api/signingkeys/'),
     'repo_details': ('GET', '/api/<repo>/'),
     'repo_create': ('POST', '/api/repos/'),
+    'repo_update': ('PATCH', '/api/<repo>/'),
     'repo_delete': ('DELETE', '/api/<repo>/'),
     'upload': ('POST', '/api/<repo>/upload/'),
+    'upload_status': ('GET', '/api/upload-status/<task_id>/'),
     'package_delete': ('DELETE', '/api/<repo>/pkg/<package>/'),
     'package_detail': ('GET', '/api/<repo>/pkg/<package>/'),
-    'package_copy': ('POST', '/api/<repo>/pkg/<package>/copy/')
+    'package_copy': ('POST', '/api/<repo>/pkg/<package>/copy/'),
+    'create_signingkey': ('POST', '/api/signingkeys/'),
+    'delete_signingkey': ('DELETE', '/api/signingkeys/<fingerprint>/'),
+    'download_signingkey': ('GET', '/api/signingkeys/<fingerprint>/download/'),
+    'whoami': ('GET', '/api/whoami'),
 }
 
 
@@ -114,9 +121,25 @@ class RestInterface:
         })
 
     @cli_method
+    def repo_update(self, repo_uid, signing_key="", retention_policy="", multi_arch="", promote_to=""):
+        '''
+        Update repository settings (partial update)
+        '''
+        postdata = {}
+        if signing_key:
+            postdata['signing_key'] = signing_key
+        if retention_policy:
+            postdata['retention_policy'] = retention_policy
+        if multi_arch:
+            postdata['multi_arch'] = multi_arch.lower() in ('true', '1', 'yes')
+        if promote_to:
+            postdata['promote_to'] = promote_to
+        return self._request('repo_update', repo=repo_uid, postdata=postdata)
+
+    @cli_method
     def repo_delete(self, repo_uid):
         '''
-        Delete new repository
+        Delete a repository
         '''
         return self._request('repo_delete', repo=repo_uid)
 
@@ -130,11 +153,42 @@ class RestInterface:
     @cli_method
     def package_delete(self, repo_uid, package_uid):
         '''
-        Delete a repository
+        Delete a package from a repository
         '''
         return self._request('package_delete', repo=repo_uid, package=package_uid)
 
-    def upload(self, filepath, repo_uid, overwrite):
+    @cli_method
+    def create_signingkey(self, name, email):
+        '''
+        Generate a new PGP signing key
+        '''
+        return self._request('create_signingkey', postdata={
+            'name': name,
+            'email': email
+        })
+
+    @cli_method
+    def delete_signingkey(self, fingerprint):
+        '''
+        Delete a PGP signing key
+        '''
+        return self._request('delete_signingkey', fingerprint=fingerprint)
+
+    @cli_method
+    def download_signingkey(self, fingerprint):
+        '''
+        Download the public key (.asc) for a signing key
+        '''
+        return self._request('download_signingkey', fingerprint=fingerprint)
+
+    @cli_method
+    def whoami(self):
+        '''
+        Show current user info and API token
+        '''
+        return self._request('whoami')
+
+    def upload(self, filepath, repo_uid, overwrite, wait=True, poll_interval=2, timeout=300):
         '''
         Upload package files to a repo
         '''
@@ -144,9 +198,35 @@ class RestInterface:
 
         with open(filepath, 'rb') as package_file:
             files = {'package_file': package_file}
-            return self._request('upload', repo=repo_uid, files=files, postdata=postdata)
+            response = self._request('upload', repo=repo_uid, files=files, postdata=postdata)
 
-    def _request(self, endpoint_name, repo=None, package=None, query_args=None, postdata=None, files=None):
+        if not wait:
+            return response
+
+        # Poll upload status until completion or timeout
+        task_id = response.get('task_id')
+        if not task_id:
+            return response
+
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            time.sleep(poll_interval)
+            try:
+                status_resp = self._request('upload_status', task_id=task_id)
+                status = status_resp.get('status', '')
+                if status in ('completed', 'failed'):
+                    if status == 'failed':
+                        error_msg = status_resp.get('error_message', 'Unknown error')
+                        logger.error(f"Upload processing failed: {error_msg}")
+                    return status_resp
+            except Exception as e:
+                logger.warning(f"Error polling upload status: {e}")
+
+        logger.warning(f"Upload status poll timed out after {timeout}s for task {task_id}")
+        return response
+
+    def _request(self, endpoint_name, repo=None, package=None, task_id=None,
+                 fingerprint=None, query_args=None, postdata=None, files=None):
         endpoint = REQUEST_ENDPOINTS[endpoint_name]
         method = endpoint[0]
         url = self.base_url + endpoint[1]
@@ -155,6 +235,10 @@ class RestInterface:
             url = url.replace('<repo>', repo)
         if package is not None:
             url = url.replace('<package>', package)
+        if task_id is not None:
+            url = url.replace('<task_id>', task_id)
+        if fingerprint is not None:
+            url = url.replace('<fingerprint>', fingerprint)
 
         if query_args is not None:
             url += '?'

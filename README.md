@@ -40,7 +40,7 @@ The server supports:
   - Dark/light theme toggle
 
 
-![OpenRepo Demo Video](https://github.com/openkilt/openrepo/blob/master/util/doc_images/openrepo-demo.gif?raw=true)
+![OpenRepo Demo Video](https://raw.githubusercontent.com/opentreecz/openrepo/main/util/doc_images/openrepo-demo.gif)
 
 ## Getting Started
 
@@ -85,7 +85,7 @@ Copy `.env.example` to `.env` and fill in values before starting.
 
 ## CI Integration
 
-A common requirement is to automatically upload packages produced by Continuous Integration.  See the [CLI documentation](cli/) for details.
+A common requirement is to automatically upload packages produced by Continuous Integration.  See the [CLI documentation](https://opentreecz.github.io/openrepo/cli) for details.
 
 The CLI (or REST API) can push packages to a repo, promote or copy packages between repos, and query repo/package status.
 

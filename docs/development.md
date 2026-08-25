@@ -95,7 +95,7 @@ Navigate to **http://localhost:5173/** — both servers support live reload.
 OPENREPO_VAR_DIR=/tmp/openrepo python3 web/manage.py test repo.tests
 ```
 
-208 tests total, 1 skipped (RPM integration — requires a real RPM file on disk).
+~260+ tests total, 1 skipped (RPM integration — requires a real RPM file on disk).
 
 **Run a specific test module:**
 ```bash
@@ -138,9 +138,12 @@ cd frontend && npm run type-check
 
 | Workflow | File | Triggers |
 |---|---|---|
-| **CI** (Django + CLI tests) | `.github/workflows/main.yml` | push, pull_request, weekly |
+| **CI** (Django + CLI tests + coverage) | `.github/workflows/main.yml` | push, pull_request, weekly |
 | **Lint** (flake8 + ESLint) | `.github/workflows/lint.yml` | push, pull_request |
-| **Docker build & push** | `.github/workflows/docker-build.yml` | push to `main`, version tags, weekly |
+| **Docker build & push** (amd64, arm64, arm/v7) | `.github/workflows/docker-build.yml` | push to `main`, version tags, weekly |
+| **Package build** (DEB + RPM, multi-arch) | `.github/workflows/build-packages.yml` | version tags, manual |
+| **Smoke test** | `.github/workflows/smoke-test.yml` | after Docker build, manual |
+| **PR Review** (automated checks) | `.github/workflows/pr-review.yml` | pull_request |
 | **GitHub Pages** | `.github/workflows/pages.yml` | push to `main` |
 
 Docker images are pushed to `ghcr.io/opentreecz/openrepo:latest`. Weekly scheduled runs rebuild against the latest base images so security patches land automatically.
