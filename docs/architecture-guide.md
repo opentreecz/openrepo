@@ -66,7 +66,34 @@ repo/
 
 ### RPM (.rpm) repositories
 
-RPM repositories are simpler regarding architecture:
+RPM repositories support two modes:
+
+**Multi-arch mode (recommended, `multi_arch=True`):**
+
+```
+repo/
+  x86_64/
+    repodata/
+      repomd.xml
+      primary.xml.gz
+    myapp-1.0-1.x86_64.rpm
+    myapp-common-1.0-1.noarch.rpm   <- noarch duplicated here
+  aarch64/
+    repodata/
+      repomd.xml
+      primary.xml.gz
+    myapp-1.0-1.aarch64.rpm
+    myapp-common-1.0-1.noarch.rpm   <- noarch duplicated here
+  public.gpg
+```
+
+- Per-architecture subdirectories (`x86_64/`, `aarch64/`, etc.)
+- `noarch` packages are symlinked into **every** architecture directory (same pattern as Debian's `Architecture: all`)
+- `createrepo` runs separately for each architecture directory
+- DNF/YUM clients use `$basearch` in the `baseurl` to automatically resolve to their architecture
+- This is the standard pattern used by Fedora, RHEL, CentOS, and other major RPM distros
+
+**Legacy mode (`multi_arch=False`):**
 
 ```
 repo/
@@ -76,14 +103,12 @@ repo/
   repodata/
     repomd.xml
     primary.xml.gz
-    filelists.xml.gz
-    other.xml.gz
 ```
 
-- All packages (all architectures) are stored flat in the repository
-- `createrepo` records each package's architecture in the XML metadata
-- `dnf`/`yum` clients automatically filter by their system architecture at install time
-- `noarch` packages are installed regardless of the client architecture
+- All packages (all architectures) stored flat in one directory
+- Single `createrepo` run generates one metadata set
+- `dnf`/`yum` clients filter by their system architecture at install time
+- `noarch` packages are installed regardless of client architecture
 
 ### Generic file repositories
 

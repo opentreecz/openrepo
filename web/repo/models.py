@@ -81,9 +81,10 @@ class Repository(models.Model):
     # Used by max_age_days and keep_latest_n_and_age policies
     retention_max_age_days = models.PositiveIntegerField(null=True, blank=True)
 
-    # When True (deb repos only), generate per-architecture binary dirs instead of binary-any/.
-    # Packages with Architecture: all are included in every arch index (Debian policy).
-    # Existing repos default to False so clients using binary-any/ are not broken until opted in.
+    # When True (deb and rpm repos), generate per-architecture directories.
+    # Deb: binary-amd64/, binary-arm64/; Packages with Architecture: all in every arch index.
+    # RPM: x86_64/, aarch64/; noarch packages symlinked into every arch directory.
+    # Existing repos default to False so clients are not broken until opted in.
     multi_arch = models.BooleanField(default=False)
 
     package_count = models.IntegerField(default=0)

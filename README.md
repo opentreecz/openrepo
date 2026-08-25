@@ -30,7 +30,7 @@ The current release line focuses on reliable repository rebuilds, multi-architec
 The server supports:
 
   - RPM, Deb, and Generic repository generation and hosting compatible with Debian/Ubuntu `apt-get` and Red Hat `yum`/`dnf` tools
-  - **Multi-architecture Debian repositories** — generate per-architecture `binary-amd64/`, `binary-arm64/`, etc. instead of the legacy `binary-any/` layout
+  - **Multi-architecture Debian & RPM repositories** — generate per-architecture directories (`binary-amd64/`, `x86_64/`, etc.) with proper `noarch`/`all` handling
   - Package upload, deletion, copying, and promotion (e.g., for moving packages through dev → QA → beta → production repos)
   - **Package retention policies** — automatically prune old package versions by count, age, or both
   - PGP signing key creation and management
@@ -116,14 +116,21 @@ GitHub Pages documentation is built from `docs/` and published at [opentreecz.gi
 
 ## Features
 
-### Multi-architecture Debian repositories
+### Multi-architecture repositories
 
-By default, Debian repos use `binary-any/` (compatible with all packages).  Enable **multi-arch** mode per repo in Repo Settings to generate proper per-architecture directories:
+Enable **multi-arch** mode per repo in Repo Settings to generate per-architecture directories:
 
-- Uploaded packages are indexed under their actual architecture (e.g. `binary-amd64/`, `binary-arm64/`)
-- Packages with `Architecture: all` appear in every arch index per Debian policy
-- The generated setup instructions automatically reflect all detected architectures: `deb [arch=amd64,arm64 signed-by=...] ...`
+**Debian (.deb):**
+- Per-arch directories: `binary-amd64/`, `binary-arm64/`, etc.
+- `Architecture: all` packages appear in every arch index per Debian policy
+- Setup instructions include `[arch=amd64,arm64 ...]`
 - Existing repos default to `binary-any/` — opt in per-repo to avoid breaking existing clients
+
+**RPM (.rpm):**
+- Per-arch subdirectories: `x86_64/`, `aarch64/`, etc.
+- `noarch` packages symlinked into every architecture directory
+- Setup instructions use `$basearch` variable (auto-resolved by DNF/YUM)
+- Existing repos default to flat mode — opt in per-repo to avoid breaking existing clients
 
 ### Package retention policies
 
