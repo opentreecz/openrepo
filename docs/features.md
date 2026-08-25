@@ -143,3 +143,27 @@ Every repo regeneration produces a structured build log viewable in the web UI:
 ## Package deduplication
 
 If the same binary is uploaded to multiple repos (same SHA-512 checksum), only one copy of the file is stored on disk. The second repo gets a symlink to the existing file. Disk usage is not multiplied by the number of repos a package lives in.
+
+---
+
+## Automated sync with openrepo-sync
+
+[openrepo-sync](https://github.com/opentreecz/openrepo-sync) is a companion CLI tool (written in Rust) that automatically mirrors packages from upstream sources into OpenRepo. It supports 6 source types:
+
+| Source Type | Description |
+|---|---|
+| `github` | GitHub Releases API — picks correct arch asset automatically |
+| `deb_repo` | Debian APT repository (standard + flat/OBS layout) |
+| `rpm_repo` | RPM (YUM/DNF) repository (repomd.xml + primary.xml/sqlite) |
+| `direct_url` | Fixed URL with version in the filename |
+| `direct_url_latest` | Fixed URL, version extracted from package metadata |
+| `sourceforge` | SourceForge file releases |
+
+Features:
+- Configurable retention (keep N newest versions, prune the rest)
+- GPG signature verification for DEB and RPM repositories
+- Package metadata version verification before upload
+- Scheduled mode for continuous syncing (Docker container)
+- Multi-platform: `linux/amd64`, `linux/arm64`, `linux/arm/v7`
+
+Documentation: [opentreecz.github.io/openrepo-sync](https://opentreecz.github.io/openrepo-sync/)

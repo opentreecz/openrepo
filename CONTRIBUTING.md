@@ -250,6 +250,10 @@ OpenRepo supports hosting packages for multiple architectures in a single reposi
 4. Add the repo type choice to `Repository.REPO_TYPES`
 5. Update frontend to include the new type in the create dialog
 
+## Related Projects
+
+- **[openrepo-sync](https://github.com/opentreecz/openrepo-sync)** — Automated package sync tool (Rust) that uploads to OpenRepo. Changes to the REST API should be coordinated between both projects. See the [openrepo-sync documentation](https://opentreecz.github.io/openrepo-sync/) for its API client implementation.
+
 ## License
 
 By contributing to OpenRepo, you agree that your contributions will be licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).

@@ -86,6 +86,17 @@ npm run build
 
 ---
 
+## Companion Tools
+
+### openrepo-sync — Automated Package Synchronization
+
+[openrepo-sync](https://github.com/opentreecz/openrepo-sync) automatically mirrors packages from upstream sources into your OpenRepo repositories. It supports 6 source types: GitHub Releases, Debian APT repos, RPM (YUM/DNF) repos, SourceForge, and direct URLs.
+
+- [openrepo-sync documentation](https://opentreecz.github.io/openrepo-sync/)
+- [Docker image](https://github.com/opentreecz/openrepo-sync/pkgs/container/openrepo-sync)
+
+---
+
 ## Source & License
 
 > **GitHub Repository:** [github.com/opentreecz/openrepo](https://github.com/opentreecz/openrepo) — source code, issues, pull requests, releases
