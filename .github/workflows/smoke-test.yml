@@ -52,16 +52,6 @@ jobs:
           fi
           echo "Health endpoint OK: $response"
 
-      - name: Test API endpoint (unauthenticated)
-        run: |
-          response=$(curl -sf http://localhost:7376/api/repos/ || echo "FAILED")
-          if [ "$response" = "FAILED" ]; then
-            echo "::error::API endpoint not responding"
-            docker compose logs django
-            exit 1
-          fi
-          echo "API response: $response"
-
       - name: Test frontend loads
         run: |
           response=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:7376/)
@@ -97,6 +87,18 @@ jobs:
           " 2>/dev/null | tail -1)
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
           echo "Got admin API token"
+
+      - name: Test API endpoint (authenticated)
+        run: |
+          response=$(curl -sf \
+            -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
+            http://localhost:7376/api/repos/ || echo "FAILED")
+          if [ "$response" = "FAILED" ]; then
+            echo "::error::Authenticated API endpoint not responding"
+            docker compose logs django
+            exit 1
+          fi
+          echo "API response: $response"
 
       - name: Create signing key
         id: key
