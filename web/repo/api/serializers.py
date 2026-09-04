@@ -142,17 +142,6 @@ class RepoDetailSerializer(serializers.HyperlinkedModelSerializer):
 
         promote_to = attrs.get("promote_to")
         if promote_to:
-            conflict = Repository.objects.filter(promote_to=promote_to)
-            if self.instance:
-                conflict = conflict.exclude(pk=self.instance.pk)
-            if conflict.exists():
-                raise serializers.ValidationError(
-                    {
-                        "promote_to": f"Repo '{promote_to.repo_uid}' is already the promotion target of "
-                        f"'{conflict.first().repo_uid}'"
-                    }
-                )
-
             # Prevent circular promotion chains
             if self.instance:
                 current = promote_to

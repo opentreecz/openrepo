@@ -41,7 +41,7 @@
 
 ### Authentication
 
-- `TokenAuthentication` + `CsrfExemptSessionAuthentication` (CSRF disabled!)
+- `TokenAuthentication` + `SessionAuthentication` (CSRF enforced for session auth)
 - `CustomOpenRepoPermission` at `authentication.py:25-91`:
   - Safe methods: require `is_authenticated`
   - Write on pass-through views: check via string class name comparison (fragile, line 44)
@@ -71,16 +71,16 @@
 
 ## Security Findings
 
-| # | Finding | Severity | Location |
-|---|---------|----------|----------|
-| 1 | Shell injection via `shell=True` with architecture field | Critical | `base_repo.py:184` |
-| 2 | CSRF disabled for session auth | High | `authentication.py:94-97` |
-| 3 | Hardcoded fallback SECRET_KEY | High | `settings.py:53-57` |
-| 4 | `ALLOWED_HOSTS = ["*"]` by default | Medium | `settings.py:62-67` |
-| 5 | PGP private keys in plaintext DB | Medium | `models.py:33-35` |
+| # | Finding | Severity | Status |
+|---|---------|----------|--------|
+| 1 | ~~Shell injection via `shell=True` with architecture field~~ | Critical | ✅ RESOLVED — `shell=False`, argument lists, `RegexValidator` on architecture, 600s timeout |
+| 2 | ~~CSRF disabled for session auth~~ | High | ✅ RESOLVED — `CsrfExemptSessionAuthentication` removed, standard `SessionAuthentication` used |
+| 3 | ~~Hardcoded fallback SECRET_KEY~~ | High | ✅ RESOLVED — raises `ImproperlyConfigured` if env var not set |
+| 4 | ~~`ALLOWED_HOSTS = ["*"]` by default~~ | Medium | ✅ RESOLVED — defaults to `["localhost", "127.0.0.1", DOMAIN_NAME]` |
+| 5 | PGP private keys in plaintext DB | Medium | `models.py:33-35` (Phase 4.4) |
 | 6 | PGP keys generated without passphrase | Medium | `keyring.py:52` |
-| 7 | No upload file size limit | Medium | `views.py:312-357` |
-| 8 | Upload status lacks per-user authz | Low | `views.py:360-369` |
+| 7 | ~~No upload file size limit~~ | Medium | ✅ RESOLVED — `MAX_UPLOAD_SIZE` setting (default 2 GB) |
+| 8 | ~~Upload status lacks per-user authz~~ | Low | ✅ RESOLVED — checks superuser or write access |
 | 9 | Weak password validation (min 6, no common check) | Low | `settings.py:155-171` |
 | 10 | `repo_uid` validation only at serializer level | Low | `base_repo.py:220` |
 | 11 | No filename/metadata sanitization on upload | Low | `views.py:327`, `base_repo.py:89` |
@@ -99,8 +99,8 @@
 ### Repo Adapters (`web/adapters/repo/`)
 
 - `base_repo.py:140,148` raises bare `Exception` — should be `NotImplementedError`
-- `base_repo.py:184` uses `shell=True` — security risk
-- No subprocess timeout — could hang indefinitely
+- ~~`base_repo.py:184` uses `shell=True`~~ — ✅ RESOLVED: `shell=False` with argument lists
+- ~~No subprocess timeout~~ — ✅ RESOLVED: 600-second timeout
 - `rpm_repo.py:176-191` duplicates `_copy_packages` logic from base
 - `deb_repo.py:51-55` and `deb_repo.py:62-65` compute architecture list independently
 - `use_python_tools` checked via env var at call-time — should be constructor-time

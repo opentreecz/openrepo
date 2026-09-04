@@ -15,6 +15,7 @@ jobs:
 
     env:
       OPENREPO_VAR_DIR: /tmp/openrepo/
+      OPENREPO_SECRET_KEY: test-secret-key-for-ci-only
 
     steps:
       - uses: actions/checkout@v7

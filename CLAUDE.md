@@ -31,7 +31,8 @@ web/
       serializers.py     — 12 serializer classes
       upload_processor.py — Async upload handling (background thread)
       retention.py       — Package retention policy logic
-      authentication.py  — Token auth + CsrfExemptSessionAuthentication
+      authentication.py  — Token auth + permissions
+      middleware.py      — VersionHeaderMiddleware (X-OpenRepo-Version)
       pagination.py      — PageNumberPagination (max 500)
       filters.py         — Build/BuildLog filters
       util.py            — Custom hyperlinked fields, SHA-512
@@ -86,17 +87,26 @@ Auth: `Authorization: Token <key>` (DRF TokenAuthentication).
 
 ### Security (Critical/High)
 
-1. **Shell injection** — `base_repo.py:184` uses `shell=True` with DB-derived values
-   (architecture field from uploaded packages). A crafted .deb/.rpm could achieve RCE.
+1. **~~Shell injection~~** — ✅ RESOLVED: `base_repo.py` now uses `shell=False` with
+   argument lists. Architecture field has `RegexValidator`. Subprocess timeout (600s) added.
 
-2. **CSRF disabled** — `CsrfExemptSessionAuthentication` at `authentication.py:94-97`
-   disables CSRF for all session-authenticated API requests.
+2. **~~CSRF disabled~~** — ✅ RESOLVED: `CsrfExemptSessionAuthentication` removed.
+   Standard `SessionAuthentication` with CSRF enforcement. Frontend sends `X-CSRFToken`.
 
-3. **Hardcoded SECRET_KEY** — `settings.py:53-57` falls back to an insecure hardcoded
-   key when env vars are not set.
+3. **~~Hardcoded SECRET_KEY~~** — ✅ RESOLVED: Raises `ImproperlyConfigured` if
+   `OPENREPO_SECRET_KEY` or `DJANGO_SECRET_KEY` env var is not set.
 
 4. **PGP keys in plaintext** — `models.py:33-35` stores private keys and passphrases
-   as plain `CharField` in the database.
+   as plain `CharField` in the database. (Phase 4.4)
+
+### Security (Medium/Low — resolved)
+
+- **~~ALLOWED_HOSTS = ["*"]~~** — ✅ RESOLVED: Defaults to `["localhost", "127.0.0.1", DOMAIN_NAME]`.
+  Use `OPENREPO_ALLOWED_HOSTS` env var for additional hosts.
+- **~~No upload file size limit~~** — ✅ RESOLVED: `MAX_UPLOAD_SIZE` setting (default 2 GB),
+  configurable via `OPENREPO_MAX_UPLOAD_SIZE` env var.
+- **~~Upload status lacks per-user authz~~** — ✅ RESOLVED: `UploadStatusView` checks
+  superuser or write access to the task's repo.
 
 ### Architecture
 
@@ -108,7 +118,7 @@ Auth: `Authorization: Token <key>` (DRF TokenAuthentication).
 
 7. **No adapter registry** — `if/elif` chains for adapter dispatch.
 
-8. **No subprocess timeout** — `_execute_commands` could hang indefinitely.
+8. **~~No subprocess timeout~~** — ✅ RESOLVED: 600-second timeout on all subprocess calls.
 
 9. **Retention N+1 queries** — `retention.py:42-47` runs separate DB query per package.
 
@@ -118,7 +128,8 @@ Auth: `Authorization: Token <key>` (DRF TokenAuthentication).
 
 11. **~~No OpenAPI spec~~** — ✅ RESOLVED: `drf-spectacular` added, schema at `/api/schema/`, Swagger UI at `/api/docs/`
 
-12. **No API versioning** — Single unversioned `/api/` path.
+12. **~~No API versioning~~** — ✅ RESOLVED: API available at both `/api/v1/` (versioned)
+    and `/api/` (backward-compatible alias). `X-OpenRepo-Version` header on all API responses.
 
 13. **~~Serializer/response mismatches~~** — ✅ RESOLVED: `@extend_schema` decorators added to fix:
     - `UploadViewSet`: `UploadResponseSerializer` for 202 response

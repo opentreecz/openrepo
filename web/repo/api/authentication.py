@@ -15,7 +15,6 @@
 import logging
 
 from rest_framework import permissions
-from rest_framework.authentication import SessionAuthentication
 
 from repo.models import Package, Repository
 
@@ -90,8 +89,3 @@ class CustomOpenRepoPermission(permissions.BasePermission):
         logger.debug(f"User {user.username} unauthorized for {repo.repo_uid}")
         return False
 
-
-class CsrfExemptSessionAuthentication(SessionAuthentication):
-
-    def enforce_csrf(self, request):
-        return  # To not perform the csrf check previously happening

@@ -39,6 +39,9 @@ urlpatterns = [
     path("api-auth/", include("rest_framework.urls")),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    # Versioned API — canonical path for new clients.
+    path("api/v1/", include("repo.api.urls")),
+    # Unversioned alias — backward-compatible for existing clients.
     path("api/", include("repo.api.urls")),
     path("back/change-password/", auth_views.PasswordChangeView.as_view(success_url="/"), name="change_password"),
 ]

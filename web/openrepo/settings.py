@@ -27,6 +27,8 @@ https://docs.djangoproject.com/en/3.2/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -50,21 +52,20 @@ RPM_VERSION_IGNORE_BUILD_NUM = (
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # Prefer OPENREPO_SECRET_KEY; fall back to DJANGO_SECRET_KEY for upstream compatibility.
-SECRET_KEY = (
-    os.getenv("OPENREPO_SECRET_KEY")
-    or os.getenv("DJANGO_SECRET_KEY")
-    or "django-insecure-s8-h-mhty&_oa)qouzm!_$8s3$yn_u4x$7q$gh7o66cd=3&o_h"
-)
+SECRET_KEY = os.getenv("OPENREPO_SECRET_KEY") or os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    raise ImproperlyConfigured(
+        "No SECRET_KEY configured. Set the OPENREPO_SECRET_KEY or DJANGO_SECRET_KEY "
+        "environment variable. Generate one with: "
+        "python -c 'from django.core.management.utils import get_random_secret_key; "
+        "print(get_random_secret_key())'"
+    )
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("OPENREPO_DEBUG", "FALSE").upper() == "TRUE"
 
-if os.getenv("OPENREPO_SECURE_HOSTS", "FALSE").upper() == "TRUE":
-    ALLOWED_HOSTS = ["localhost", "127.0.0.1", DOMAIN_NAME]
-else:
-    # For additional security, consider enabling this security feature
-    # https://security.stackexchange.com/questions/45687/what-does-djangos-allowed-hosts-variable-actually-do
-    ALLOWED_HOSTS = ["*"]
+_extra_hosts = os.getenv("OPENREPO_ALLOWED_HOSTS", "").split(",")
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", DOMAIN_NAME] + [h.strip() for h in _extra_hosts if h.strip()]
 
 # Added CSRF support through a reverse proxy with different hostname. https://docs.djangoproject.com/en/4.2/ref/settings/#std-setting-CSRF_TRUSTED_ORIGINS
 # Origins are space delimited
@@ -100,6 +101,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "repo.api.middleware.VersionHeaderMiddleware",
 ]
 
 ROOT_URLCONF = "openrepo.urls"
@@ -209,7 +211,7 @@ LOGOUT_REDIRECT_URL = "/admin/login/"
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
-        "repo.api.authentication.CsrfExemptSessionAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
     "URL_FIELD_NAME": "href",
     # Use Django's standard `django.contrib.auth` permissions,
@@ -275,6 +277,9 @@ REPO_WWW_PATH = os.path.join(OPENREPO_VAR_DIR, "www/")
 STORAGE_PREFIX_DEPTH = 2
 # The character length of the package files stored on disk
 STORAGE_FILENAME_LENGTH = 32
+
+# Maximum upload file size in bytes (default 2 GB).
+MAX_UPLOAD_SIZE = int(os.getenv("OPENREPO_MAX_UPLOAD_SIZE", str(2 * 1024 ** 3)))
 
 # In case a repo creation gets frozen in bg worker, this will allow it to reattempt
 REPO_CREATE_TIMEOUT_SEC = 60 * 60 * 2

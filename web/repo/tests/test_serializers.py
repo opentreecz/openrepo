@@ -31,7 +31,7 @@ class SerializerValidationTestCase(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("repo_uid", response.data)
+        self.assertIn("repo_uid", response.data.get("detail", ""))
 
     def test_repo_uid_disallowed_name_api_rejected(self):
         """repo_uid of 'api' is rejected as reserved"""
@@ -42,7 +42,7 @@ class SerializerValidationTestCase(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("repo_uid", response.data)
+        self.assertIn("repo_uid", response.data.get("detail", ""))
 
     def test_repo_uid_disallowed_name_admin_rejected(self):
         """repo_uid of 'admin' is rejected as reserved"""
@@ -104,7 +104,7 @@ class SerializerValidationTestCase(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("repo_uid", response.data)
+        self.assertIn("repo_uid", response.data.get("detail", ""))
 
     def test_repo_uid_disallowed_name_packages_rejected(self):
         """repo_uid of 'packages' is rejected — it would shadow API paths"""
@@ -115,7 +115,7 @@ class SerializerValidationTestCase(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("repo_uid", response.data)
+        self.assertIn("repo_uid", response.data.get("detail", ""))
 
     def test_repo_uid_disallowed_name_pkg_rejected(self):
         """repo_uid of 'pkg' is rejected — it would shadow package detail paths"""
@@ -126,7 +126,7 @@ class SerializerValidationTestCase(APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn("repo_uid", response.data)
+        self.assertIn("repo_uid", response.data.get("detail", ""))
 
 
 class PromoteToValidationTestCase(APITestCase):
@@ -151,8 +151,8 @@ class PromoteToValidationTestCase(APITestCase):
         self.assertEqual(response.status_code, 201, response.data)
         return response.data["repo_uid"]
 
-    def test_two_repos_cannot_promote_to_the_same_target(self):
-        """A repo_uid already used as someone's promote_to target can't be claimed again"""
+    def test_multiple_repos_can_promote_to_the_same_target(self):
+        """Multiple repos can promote to the same destination repo"""
         target = self._create_repo("promo-target")
         self._create_repo("promo-source-a", promote_to=target)
         self._create_repo("promo-source-b")
@@ -163,8 +163,7 @@ class PromoteToValidationTestCase(APITestCase):
             HTTP_AUTHORIZATION=self.auth,
             format="json",
         )
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("promote_to", response.data)
+        self.assertEqual(response.status_code, 200, response.data)
 
     def test_updating_repo_with_its_own_existing_promote_to_is_not_a_conflict(self):
         """Re-saving a repo that already owns a promote_to target doesn't self-conflict"""

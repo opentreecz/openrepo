@@ -66,7 +66,7 @@ Default credentials:
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENREPO_SECRET_KEY` | *(insecure built-in)* | Django secret key — set this in production. `DJANGO_SECRET_KEY` is also accepted for compatibility. |
+| `OPENREPO_SECRET_KEY` | *(required)* | Django secret key — **must be set**. Generate with: `python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'`. `DJANGO_SECRET_KEY` is also accepted for compatibility. |
 | `OPENREPO_PG_PASSWORD` | `postgres` | PostgreSQL password |
 | `OPENREPO_PG_HOSTNAME` | `db` | PostgreSQL host |
 | `OPENREPO_PG_DATABASE` | `openrepo` | PostgreSQL database name |
@@ -75,9 +75,10 @@ Default credentials:
 | `OPENREPO_VAR_DIR` | `/var/lib/openrepo/` | Base directory for all persistent data |
 | `OPENREPO_DEBUG` | `FALSE` | Enable Django debug mode |
 | `OPENREPO_LOGLEVEL` | `INFO` | Log level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `OPENREPO_DOMAIN` | `localhost:8080` | Public domain name (used in repo instructions) |
-| `OPENREPO_SECURE_HOSTS` | `FALSE` | Set `TRUE` to restrict `ALLOWED_HOSTS` to `localhost` and `OPENREPO_DOMAIN` only |
+| `OPENREPO_DOMAIN` | `localhost:8080` | Public domain name (used in repo instructions and `ALLOWED_HOSTS`) |
+| `OPENREPO_ALLOWED_HOSTS` | *(none)* | Comma-separated additional hostnames for Django's `ALLOWED_HOSTS` (localhost, 127.0.0.1, and `OPENREPO_DOMAIN` are always included) |
 | `OPENREPO_CSRF_TRUSTED_ORIGINS` | *(none)* | Space-separated list of trusted CSRF origins for reverse proxies |
+| `OPENREPO_MAX_UPLOAD_SIZE` | `2147483648` | Maximum upload file size in bytes (default 2 GB) |
 | `RPM_VERSION_IGNORE_BUILD_NUM` | `false` | Set `true` to use only the RPM `version` field and ignore the `release` (build number) suffix |
 
 Copy `.env.example` to `.env` and fill in values before starting.

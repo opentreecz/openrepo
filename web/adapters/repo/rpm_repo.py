@@ -98,6 +98,7 @@ class RpmRepoAdapter(BaseRepoAdapter):
         """
         noarch_packages = [p for p in self.packages if p.architecture == "noarch"]
 
+        # Each command is a (args_list, output_file_or_None) tuple.
         exec_commands = []
         use_python_tools = os.environ.get("OPENREPO_USE_PYTHON_TOOLS") == "1"
 
@@ -115,9 +116,10 @@ class RpmRepoAdapter(BaseRepoAdapter):
             else:
                 if not os.path.isdir(settings.RPM_CACHE_DIR):
                     os.makedirs(settings.RPM_CACHE_DIR)
-                exec_commands.append(
-                    f"createrepo --cachedir {settings.RPM_CACHE_DIR} {arch_dir}"
-                )
+                exec_commands.append((
+                    ["createrepo", "--cachedir", settings.RPM_CACHE_DIR, arch_dir],
+                    None,
+                ))
 
         # GPG signing
         if self.pgp_key is None:
@@ -130,10 +132,14 @@ class RpmRepoAdapter(BaseRepoAdapter):
             for arch in architectures:
                 arch_dir = os.path.join(repo_path, arch)
                 repomd_path = os.path.join(arch_dir, "repodata", "repomd.xml")
-                exec_commands.append(
-                    f"gpg --detach-sign --yes --local-user {self.pgp_key.fingerprint} "
-                    f"--armor {repomd_path}"
-                )
+                exec_commands.append((
+                    [
+                        "gpg", "--detach-sign", "--yes",
+                        "--local-user", self.pgp_key.fingerprint,
+                        "--armor", repomd_path,
+                    ],
+                    None,
+                ))
             self._save_public_key(repo_path)
 
         return self._execute_commands(exec_commands, repo_path)
@@ -146,6 +152,7 @@ class RpmRepoAdapter(BaseRepoAdapter):
         self._copy_packages(repo_path)
 
         use_python_tools = os.environ.get("OPENREPO_USE_PYTHON_TOOLS") == "1"
+        # Each command is a (args_list, output_file_or_None) tuple.
         exec_commands = []
 
         if use_python_tools:
@@ -155,7 +162,7 @@ class RpmRepoAdapter(BaseRepoAdapter):
             if not os.path.isdir(settings.RPM_CACHE_DIR):
                 os.makedirs(settings.RPM_CACHE_DIR)
             exec_commands = [
-                f"createrepo --cachedir {settings.RPM_CACHE_DIR} {repo_path}",
+                (["createrepo", "--cachedir", settings.RPM_CACHE_DIR, repo_path], None),
             ]
 
         if self.pgp_key is None:
@@ -165,10 +172,15 @@ class RpmRepoAdapter(BaseRepoAdapter):
                 loglevel=self.BUILDLOG_WARNING,
             )
         else:
-            exec_commands.append(
-                f"gpg --detach-sign --yes --local-user {self.pgp_key.fingerprint} "
-                f"--armor {repo_path}/repodata/repomd.xml"
-            )
+            repomd_path = os.path.join(repo_path, "repodata", "repomd.xml")
+            exec_commands.append((
+                [
+                    "gpg", "--detach-sign", "--yes",
+                    "--local-user", self.pgp_key.fingerprint,
+                    "--armor", repomd_path,
+                ],
+                None,
+            ))
             self._save_public_key(repo_path)
 
         return self._execute_commands(exec_commands, repo_path)

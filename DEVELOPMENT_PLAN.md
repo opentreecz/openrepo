@@ -27,9 +27,9 @@ Docker dependency.
 
 ---
 
-## Phase 1: Foundation — API Contract & Security (Weeks 1–3)
+## Phase 1: Foundation — API Contract & Security (Weeks 1–3) ✅ COMPLETE
 
-### 1.1 OpenAPI Specification (this repo)
+### 1.1 OpenAPI Specification (this repo) ✅
 
 **Goal:** Generate a machine-readable API contract from the existing DRF views
 using `drf-spectacular`. Expose schema + Swagger UI endpoints. Fix all known
@@ -113,7 +113,7 @@ serializer/response mismatches. Update all documentation across both repos.
 4. `flake8 --config=.flake8 .` — lint passes
 5. Visit `/api/docs/` — Swagger UI renders correctly with all endpoints
 
-### 1.2 API Versioning (this repo)
+### 1.2 API Versioning (this repo) ✅
 
 **Goal:** Version the API without breaking existing clients.
 
@@ -129,7 +129,7 @@ serializer/response mismatches. Update all documentation across both repos.
 
 **No breaking change.** All existing clients continue to work via `/api/`.
 
-### 1.3 Structured Error Responses (this repo)
+### 1.3 Structured Error Responses (this repo) ✅
 
 **Goal:** Replace string-matched error detection with machine-readable error codes.
 
@@ -150,7 +150,7 @@ serializer/response mismatches. Update all documentation across both repos.
 **Key change:** "Package already exists" errors return **HTTP 409 Conflict** (not 400)
 with code `PACKAGE_EXISTS`.
 
-### 1.4 Fix Conflict Detection (Client)
+### 1.4 Fix Conflict Detection (Client) ✅
 
 **Goal:** Replace string matching with HTTP status code + error code checking.
 
@@ -161,9 +161,9 @@ with code `PACKAGE_EXISTS`.
 
 **New file:** `openrepo-sync/src/errors.rs`
 
-### 1.5 Critical Security Fixes (this repo)
+### 1.5 Critical Security Fixes (this repo) ✅
 
-**1.5a — Shell injection fix (Critical)**
+**1.5a — Shell injection fix (Critical) ✅**
 
 | File | Change |
 |------|--------|
@@ -176,32 +176,32 @@ with code `PACKAGE_EXISTS`.
 into shell commands. A crafted .deb/.rpm with malicious architecture string could
 achieve RCE.
 
-**1.5b — CSRF protection (High)**
+**1.5b — CSRF protection (High) ✅**
 
 | File | Change |
 |------|--------|
 | `web/repo/api/authentication.py` | Remove `CsrfExemptSessionAuthentication` |
 | `frontend/src/http_common.ts` | Add `X-CSRFToken` header from cookie |
 
-**1.5c — SECRET_KEY hardcoding (High)**
+**1.5c — SECRET_KEY hardcoding (High) ✅**
 
 | File | Change |
 |------|--------|
 | `web/openrepo/settings.py` | Remove hardcoded fallback. Raise `ImproperlyConfigured` if no env var. |
 
-**1.5d — ALLOWED_HOSTS (Medium)**
+**1.5d — ALLOWED_HOSTS (Medium) ✅**
 
 | File | Change |
 |------|--------|
 | `web/openrepo/settings.py` | Default to `["localhost", "127.0.0.1"]` |
 
-**1.5e — Upload file size limit (Medium)**
+**1.5e — Upload file size limit (Medium) ✅**
 
 | File | Change |
 |------|--------|
 | `web/repo/api/views.py` | Add `MAX_UPLOAD_SIZE` check, configurable via env var, default 2GB |
 
-**1.5f — Upload status authorization (Low)**
+**1.5f — Upload status authorization (Low) ✅**
 
 | File | Change |
 |------|--------|
@@ -385,18 +385,18 @@ Change `PAGE_SIZE` from 2000 to 500 to match `max_page_size`.
 ## Execution Order
 
 ```
-Phase 1 (Weeks 1-3): Foundation
-  ├── 1.1 OpenAPI spec generation (server)
-  ├── 1.2 API versioning (server)
-  ├── 1.3 Structured error responses (server)
-  ├── 1.4 Fix conflict detection (client) — depends on 1.3
-  └── 1.5 Security fixes (server) — parallel with 1.1-1.4
-       ├── 1.5a Shell injection (Critical — do first)
-       ├── 1.5b CSRF protection
-       ├── 1.5c SECRET_KEY
-       ├── 1.5d ALLOWED_HOSTS
-       ├── 1.5e Upload size limit
-       └── 1.5f Upload status authz
+Phase 1 (Weeks 1-3): Foundation ✅ COMPLETE
+  ├── 1.1 OpenAPI spec generation (server) ✅
+  ├── 1.2 API versioning (server) ✅
+  ├── 1.3 Structured error responses (server) ✅
+  ├── 1.4 Fix conflict detection (client) ✅
+  └── 1.5 Security fixes (server) ✅
+       ├── 1.5a Shell injection ✅
+       ├── 1.5b CSRF protection ✅
+       ├── 1.5c SECRET_KEY ✅
+       ├── 1.5d ALLOWED_HOSTS ✅
+       ├── 1.5e Upload size limit ✅
+       └── 1.5f Upload status authz ✅
 
 Phase 2 (Weeks 3-5): Architecture
   ├── 2.1 PackageSource trait (client)

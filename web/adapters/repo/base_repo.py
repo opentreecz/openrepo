@@ -166,28 +166,61 @@ class BaseRepoAdapter:
                 self._buildlog_write(f"Writing PGP key to {pgp_output_path}")
                 outf.write(self.pgp_key.public_key_pem)
 
+    # Subprocess timeout in seconds — prevents indefinite hangs from
+    # createrepo, apt-ftparchive, or gpg.
+    SUBPROCESS_TIMEOUT = 600
+
     def _execute_commands(self, commands, repo_path):
+        """
+        Execute a list of commands without invoking a shell.
+
+        Each element of *commands* is a ``(args, output_file)`` tuple:
+
+        * *args* — a list of strings (the program and its arguments).
+        * *output_file* — ``None``, or a path **relative to repo_path**.
+          When set, the command's stdout is written to that file (replacing
+          the old ``> file`` shell redirection pattern).
+
+        Returns ``True`` if every command succeeds, ``False`` on the first
+        non-zero exit code.
+        """
 
         working_dir = repo_path
         custom_env = os.environ.copy()
         custom_env["GNUPGHOME"] = settings.KEYRING_PATH
 
-        for command in commands:
-            with self._buildlog_section(command) as log_entry:
-                proc_status = subprocess.run(
-                    command,
-                    cwd=working_dir,
-                    env=custom_env,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    shell=True,
-                )
-                message_output = proc_status.stdout
+        for args, output_file in commands:
+            display_cmd = " ".join(args)
+            if output_file:
+                display_cmd += f" > {output_file}"
+            with self._buildlog_section(display_cmd) as log_entry:
+                try:
+                    proc_status = subprocess.run(
+                        args,
+                        cwd=working_dir,
+                        env=custom_env,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        timeout=self.SUBPROCESS_TIMEOUT,
+                    )
+                except subprocess.TimeoutExpired:
+                    log_entry.set_message(
+                        f"Command timed out after {self.SUBPROCESS_TIMEOUT}s"
+                    )
+                    log_entry.set_loglevel(self.BUILDLOG_ERROR)
+                    return False
 
-                log_entry.set_message(message_output)
+                if output_file:
+                    # Write stdout to the target file (replaces shell ">").
+                    output_path = os.path.join(repo_path, output_file)
+                    with open(output_path, "w") as f:
+                        f.write(proc_status.stdout)
+                    log_entry.set_message(f"Wrote {output_file}")
+                else:
+                    log_entry.set_message(proc_status.stdout)
+
                 if proc_status.returncode != 0:
-                    # Error code
                     log_entry.set_loglevel(self.BUILDLOG_WARNING)
                     return False
 

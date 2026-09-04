@@ -112,6 +112,9 @@ class DebRepoAdapter(BaseRepoAdapter):
         package_dest = os.path.join(repo_path, "pool/main/")
         self._copy_packages(package_dest)
 
+        # Each command is a (args_list, output_file_or_None) tuple.
+        # When output_file is set, stdout is written to that path (relative
+        # to repo_path) — replacing the old shell ">" redirection.
         exec_commands = []
 
         # Check if we should use pure-Python fallback tools (OpenWrt only)
@@ -134,57 +137,72 @@ class DebRepoAdapter(BaseRepoAdapter):
                     generate_packages_file(pool_dir, output_dir, arch=None)
         else:
             # Standard path: use apt-ftparchive (Docker, DEB, RPM, Arch, bare-metal)
-            aptftp_options = f"--db {settings.DEB_DB_PATH} -o APT::FTPArchive::AlwaysStat=true"
+            aptftp_base = [
+                "apt-ftparchive",
+                "--db", settings.DEB_DB_PATH,
+                "-o", "APT::FTPArchive::AlwaysStat=true",
+            ]
 
             if self.repo_db_obj.multi_arch and len(architectures) > 1:
                 # Per-architecture Packages index.
                 # arch=all packages must appear in every arch's index (Debian policy).
                 for arch in architectures:
-                    exec_commands.append(
-                        f"apt-ftparchive {aptftp_options} packages "
-                        f"--arch {arch} pool/ "
-                        f"> dists/stable/main/binary-{arch}/Packages"
-                    )
-                    exec_commands.append(
-                        f"gzip -k dists/stable/main/binary-{arch}/Packages"
-                    )
+                    exec_commands.append((
+                        aptftp_base + ["packages", "--arch", arch, "pool/"],
+                        f"dists/stable/main/binary-{arch}/Packages",
+                    ))
+                    exec_commands.append((
+                        ["gzip", "-k", f"dists/stable/main/binary-{arch}/Packages"],
+                        None,
+                    ))
             else:
                 # Legacy single-arch (or only one real arch present)
                 arch = architectures[0]
                 for poolname in poolnames:
-                    exec_commands.append(
-                        f"apt-ftparchive {aptftp_options} packages pool/ "
-                        f"> dists/stable/{poolname}/binary-{arch}/Packages"
-                    )
-                exec_commands.append(
-                    f"gzip -k dists/stable/{poolname}/binary-{arch}/Packages"
-                )
+                    exec_commands.append((
+                        aptftp_base + ["packages", "pool/"],
+                        f"dists/stable/{poolname}/binary-{arch}/Packages",
+                    ))
+                exec_commands.append((
+                    ["gzip", "-k", f"dists/stable/{poolname}/binary-{arch}/Packages"],
+                    None,
+                ))
 
         # Contents files (per-arch)
+        aptftp_base_contents = [
+            "apt-ftparchive",
+            "--db", settings.DEB_DB_PATH,
+            "-o", "APT::FTPArchive::AlwaysStat=true",
+        ]
         for poolname in poolnames:
             for arch in architectures:
-                exec_commands.append(
-                    f"apt-ftparchive {aptftp_options} contents pool/{poolname} "
-                    f"> dists/stable/{poolname}/Contents-{arch}"
-                )
-                exec_commands.append(
-                    f"gzip -k dists/stable/{poolname}/Contents-{arch}"
-                )
+                exec_commands.append((
+                    aptftp_base_contents + ["contents", f"pool/{poolname}"],
+                    f"dists/stable/{poolname}/Contents-{arch}",
+                ))
+                exec_commands.append((
+                    ["gzip", "-k", f"dists/stable/{poolname}/Contents-{arch}"],
+                    None,
+                ))
 
         # Per-component Release files
         for poolname in poolnames:
             for arch in architectures:
-                exec_commands.append(
-                    f"apt-ftparchive {aptftp_options} release "
-                    f"dists/stable/{poolname}/binary-{arch} "
-                    f"> dists/stable/{poolname}/binary-{arch}/Release"
-                )
+                exec_commands.append((
+                    aptftp_base_contents + [
+                        "release",
+                        f"dists/stable/{poolname}/binary-{arch}",
+                    ],
+                    f"dists/stable/{poolname}/binary-{arch}/Release",
+                ))
 
         # Top-level Release file (lists all architectures via release.conf)
-        exec_commands.append(
-            f"apt-ftparchive {aptftp_options} release -c release.conf dists/stable "
-            f"> dists/stable/Release"
-        )
+        exec_commands.append((
+            aptftp_base_contents + [
+                "release", "-c", "release.conf", "dists/stable",
+            ],
+            "dists/stable/Release",
+        ))
 
         if self.pgp_key is None:
             self._buildlog_write(
@@ -193,16 +211,24 @@ class DebRepoAdapter(BaseRepoAdapter):
                 loglevel=self.BUILDLOG_WARNING,
             )
         else:
-            exec_commands.append(
-                f"gpg -a --yes --output dists/stable/Release.gpg "
-                f"--local-user {self.pgp_key.fingerprint} "
-                f"--detach-sign dists/stable/Release"
-            )
-            exec_commands.append(
-                f"gpg -a --yes --clearsign --output dists/stable/InRelease "
-                f"--local-user {self.pgp_key.fingerprint} "
-                f"--detach-sign dists/stable/Release"
-            )
+            exec_commands.append((
+                [
+                    "gpg", "-a", "--yes",
+                    "--output", "dists/stable/Release.gpg",
+                    "--local-user", self.pgp_key.fingerprint,
+                    "--detach-sign", "dists/stable/Release",
+                ],
+                None,
+            ))
+            exec_commands.append((
+                [
+                    "gpg", "-a", "--yes", "--clearsign",
+                    "--output", "dists/stable/InRelease",
+                    "--local-user", self.pgp_key.fingerprint,
+                    "--detach-sign", "dists/stable/Release",
+                ],
+                None,
+            ))
 
             self._save_public_key(repo_path)
 

@@ -2,6 +2,7 @@
 import datetime
 import os
 import shutil
+import subprocess
 import tempfile
 from unittest.mock import MagicMock, patch
 
@@ -225,8 +226,12 @@ class BaseRepoAdapterBuildLogTestCase(TestCase):
         mock_run.return_value = mock_proc
 
         adapter = self._make_adapter()
-        result = adapter._execute_commands(["echo hello"], settings.REPO_WWW_PATH)
+        result = adapter._execute_commands([(["echo", "hello"], None)], settings.REPO_WWW_PATH)
         self.assertTrue(result)
+        # Verify shell=True is NOT used
+        mock_run.assert_called_once()
+        call_kwargs = mock_run.call_args
+        self.assertNotIn("shell", call_kwargs.kwargs or {})
 
     @patch("subprocess.run")
     def test_execute_commands_returns_false_on_failure(self, mock_run):
@@ -237,7 +242,7 @@ class BaseRepoAdapterBuildLogTestCase(TestCase):
         mock_run.return_value = mock_proc
 
         adapter = self._make_adapter()
-        result = adapter._execute_commands(["false"], settings.REPO_WWW_PATH)
+        result = adapter._execute_commands([(["false"], None)], settings.REPO_WWW_PATH)
         self.assertFalse(result)
 
     @patch("subprocess.run")
@@ -249,8 +254,43 @@ class BaseRepoAdapterBuildLogTestCase(TestCase):
         mock_run.return_value = mock_proc_fail
 
         adapter = self._make_adapter()
-        adapter._execute_commands(["cmd1", "cmd2", "cmd3"], settings.REPO_WWW_PATH)
+        adapter._execute_commands(
+            [(["cmd1"], None), (["cmd2"], None), (["cmd3"], None)],
+            settings.REPO_WWW_PATH,
+        )
         self.assertEqual(mock_run.call_count, 1)
+
+    @patch("subprocess.run")
+    def test_execute_commands_writes_stdout_to_output_file(self, mock_run):
+        """_execute_commands writes stdout to output_file when specified"""
+        mock_proc = MagicMock()
+        mock_proc.returncode = 0
+        mock_proc.stdout = "generated content"
+        mock_run.return_value = mock_proc
+
+        adapter = self._make_adapter()
+        output_dir = os.path.join(settings.REPO_WWW_PATH, "output_test")
+        os.makedirs(output_dir, exist_ok=True)
+
+        result = adapter._execute_commands(
+            [(["some-tool", "arg"], "result.txt")],
+            output_dir,
+        )
+        self.assertTrue(result)
+        output_path = os.path.join(output_dir, "result.txt")
+        self.assertTrue(os.path.isfile(output_path))
+        with open(output_path) as f:
+            self.assertEqual(f.read(), "generated content")
+
+    @patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="slow", timeout=600))
+    def test_execute_commands_handles_timeout(self, mock_run):
+        """_execute_commands returns False when a command times out"""
+        adapter = self._make_adapter()
+        result = adapter._execute_commands(
+            [(["slow-command"], None)],
+            settings.REPO_WWW_PATH,
+        )
+        self.assertFalse(result)
 
     def test_generate_repo_structure_raises_in_base(self):
         """BaseRepoAdapter._generate_repo_structure raises Exception (must be subclassed)"""

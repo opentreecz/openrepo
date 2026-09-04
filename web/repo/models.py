@@ -16,6 +16,7 @@ import logging
 import uuid
 
 from django.contrib.auth.models import User
+from django.core.validators import RegexValidator
 from django.db import models
 
 logger = logging.getLogger("openrepo_web")
@@ -55,7 +56,7 @@ class Repository(models.Model):
     repo_type = models.CharField(max_length=128, choices=REPO_TYPES, db_index=True)
 
     signing_key = models.ForeignKey(PGPSigningKey, blank=True, null=True, on_delete=models.PROTECT)
-    promote_to = models.OneToOneField("self", blank=True, null=True, on_delete=models.CASCADE)
+    promote_to = models.ForeignKey("self", blank=True, null=True, on_delete=models.SET_NULL, related_name="promoted_from")
 
     RETENTION_NONE = "none"
     RETENTION_KEEP_LATEST_N = "keep_latest_n"
@@ -114,7 +115,14 @@ class Package(models.Model):
     # The name of the package without the version string
     package_name = models.CharField(db_index=True, max_length=65536)
 
-    architecture = models.CharField(max_length=256, db_index=True)
+    architecture = models.CharField(
+        max_length=256,
+        db_index=True,
+        validators=[RegexValidator(
+            regex=r'^[a-zA-Z0-9_.+-]+$',
+            message="Architecture may only contain alphanumeric characters, dots, underscores, hyphens, and plus signs.",
+        )],
+    )
 
     version = models.CharField(db_index=True, max_length=65536)
     build_date = models.DateTimeField(null=True, blank=True)

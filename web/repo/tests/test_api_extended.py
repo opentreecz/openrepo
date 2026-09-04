@@ -59,7 +59,7 @@ class CircularPromoteDetectionTest(APITestCase):
             HTTP_AUTHORIZATION=self.auth, format='json',
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('promote_to', response.data)
+        self.assertIn('promote_to', response.data.get('detail', ''))
 
     def test_multiple_repos_pointing_to_same_target(self):
         self.client.put(
@@ -75,4 +75,4 @@ class CircularPromoteDetectionTest(APITestCase):
              'promote_to': 'repo-b', 'signing_key': self.signing_key.fingerprint},
             HTTP_AUTHORIZATION=self.auth, format='json',
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

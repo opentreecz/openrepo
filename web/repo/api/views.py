@@ -354,6 +354,12 @@ class UploadViewSet(viewsets.ViewSet):
         if file_uploaded is None:
             raise rest_framework.exceptions.ValidationError({"package_file": "This field is required."})
 
+        if file_uploaded.size > settings.MAX_UPLOAD_SIZE:
+            raise rest_framework.exceptions.ValidationError(
+                {"package_file": f"File size {file_uploaded.size} bytes exceeds the maximum "
+                 f"allowed size of {settings.MAX_UPLOAD_SIZE} bytes."}
+            )
+
         overwrite_str = request.POST.get("overwrite", "0").lower()
         overwrite = overwrite_str in ("true", "1", "yes")
         filesize = file_uploaded.size
@@ -397,6 +403,12 @@ class UploadStatusView(viewsets.ViewSet):
             task = UploadTask.objects.get(pk=task_id)
         except UploadTask.DoesNotExist:
             raise rest_framework.exceptions.NotFound("Upload task not found")
+
+        # Authorization: user must be superuser or have write access to the task's repo.
+        # Return 404 (not 403) to avoid leaking task existence.
+        if not request.user.is_superuser:
+            if not Repository.objects.filter(pk=task.repo_id, write_access=request.user).exists():
+                raise rest_framework.exceptions.NotFound("Upload task not found")
 
         serializer = UploadTaskSerializer(task, context={"request": request})
         return Response(serializer.data)
