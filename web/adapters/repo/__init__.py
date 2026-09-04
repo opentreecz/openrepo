@@ -12,16 +12,16 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-from .deb_repo import DebRepoAdapter
-from .generic_repo import GenericRepoAdapter
-from .rpm_repo import RpmRepoAdapter
+from .deb_repo import DebRepoAdapter  # noqa: F401
+from .generic_repo import GenericRepoAdapter  # noqa: F401
+from .rpm_repo import RpmRepoAdapter  # noqa: F401
 
 
 def get_repo_adapter(repo_obj):
-    if repo_obj.repo_type == "deb":
-        return DebRepoAdapter(repo_obj)
-    elif repo_obj.repo_type == "rpm":
-        return RpmRepoAdapter(repo_obj)
-    elif repo_obj.repo_type == "files":
-        return GenericRepoAdapter(repo_obj)
-    raise Exception("Not implemented")
+    """Return the appropriate repo adapter for the given Repository object."""
+    from adapters.registry import REPO_ADAPTERS
+
+    adapter_cls = REPO_ADAPTERS.get(repo_obj.repo_type)
+    if adapter_cls is None:
+        raise ValueError(f"Unknown repo type: {repo_obj.repo_type!r}")
+    return adapter_cls(repo_obj)

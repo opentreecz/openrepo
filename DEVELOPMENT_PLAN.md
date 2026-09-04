@@ -233,47 +233,30 @@ into `src/gpg.rs`.
 Single HTTP client with shared connection pool. Remove 5 duplicate
 `Client::builder()` calls.
 
-### 2.4 Fix Server Adapter Abstractions (this repo)
+### 2.4 Fix Server Adapter Abstractions (this repo) ✅
 
 | File | Change |
 |------|--------|
-| `web/adapters/file/base_adapter.py` | Convert to `abc.ABC`, use `@abstractmethod`. Fix constructor. |
-| `web/adapters/file/deb_adapter.py` | Fix constructor signature to match base class |
-| `web/adapters/file/rpm_adapter.py` | Remove commented-out code |
-| `web/adapters/repo/base_repo.py` | `NotImplementedError` instead of `Exception`. Add subprocess timeout (600s). |
-| `web/adapters/repo/rpm_repo.py` | Merge `_symlink_packages_to_dir` into base class |
+| `web/adapters/file/base_adapter.py` | ✅ Converted to `abc.ABC` with `@abstractmethod`. Constructor stores `filepath` and `original_filename`. |
+| `web/adapters/file/deb_adapter.py` | ✅ Fixed constructor to `(filepath, original_filename=None)`, calls `super().__init__()` |
+| `web/adapters/file/rpm_adapter.py` | ✅ Fixed constructor, removed commented-out code |
+| `web/adapters/file/file_adapter.py` | ✅ Calls `super().__init__()` |
+| `web/adapters/repo/base_repo.py` | ✅ `NotImplementedError` instead of `Exception`. `_copy_packages` accepts optional `packages` param. |
+| `web/adapters/repo/rpm_repo.py` | ✅ `_symlink_packages_to_dir` removed, uses `_copy_packages(packages=)` from base |
 
-**Current issues:**
-- `base_adapter.py` is not actually abstract — methods return `None` silently
-- `deb_adapter.py` constructor takes `(filepath)` but base declares `(filepath, original_filename)` — LSP violation
-- `base_repo.py` raises bare `Exception` instead of `NotImplementedError`
-- No subprocess timeout — `createrepo` or `apt-ftparchive` could hang indefinitely
-- `_symlink_packages_to_dir` in `rpm_repo.py` duplicates `_copy_packages` from base
+### 2.5 Adapter Registry (this repo) ✅
 
-### 2.5 Adapter Registry (this repo)
-
-**New file:** `web/adapters/registry.py`
-
-```python
-REPO_ADAPTERS = {
-    "deb": DebRepoAdapter,
-    "rpm": RpmRepoAdapter,
-    "files": GenericRepoAdapter,
-}
-FILE_ADAPTERS = {
-    "deb": DebFileAdapter,
-    "rpm": RpmFileAdapter,
-    "files": GenericFileAdapter,
-}
-```
+**New file:** `web/adapters/registry.py` — dict-based adapter lookup replacing
+`if/elif` chains. Factory functions in `__init__.py` use lazy imports to avoid
+circular dependencies.
 
 ### 2.6 Code Deduplication Summary
 
-| Duplication | Strategy | Effort |
+| Duplication | Strategy | Status |
 |-------------|----------|--------|
-| GPG verification (~200 lines, client) | Extract to `src/gpg.rs` | Small |
-| `reqwest::Client` (6 places, client) | Pass shared client | Small |
-| `_symlink_packages_to_dir` vs `_copy_packages` (server) | Merge into base class | Small |
+| GPG verification (~200 lines, client) | Extract to `src/gpg.rs` | Pending |
+| `reqwest::Client` (6 places, client) | Pass shared client | Pending |
+| `_symlink_packages_to_dir` vs `_copy_packages` (server) | Merge into base class | ✅ Done |
 | Architecture resolution in deb adapter (server) | Extract and reuse | Trivial |
 | Test setUp boilerplate (server, 20 files) | Extract shared fixtures module | Medium |
 | API URL patterns (Rust + Python clients) | Generate from OpenAPI spec long-term | Medium |
@@ -402,9 +385,9 @@ Phase 2 (Weeks 3-5): Architecture
   ├── 2.1 PackageSource trait (client)
   ├── 2.2 GPG module extraction (client)
   ├── 2.3 Shared reqwest::Client (client)
-  ├── 2.4 Fix server adapter abstractions (server)
-  ├── 2.5 Adapter registry (server)
-  └── 2.6 Remaining deduplication (both)
+  ├── 2.4 Fix server adapter abstractions (server) ✅
+  ├── 2.5 Adapter registry (server) ✅
+  └── 2.6 Remaining deduplication (both) — server ✅, client pending
 
 Phase 3 (Weeks 5-7): Testing
   ├── 3.1 Typed API client structs (client) — depends on 1.1

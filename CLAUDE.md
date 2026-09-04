@@ -43,14 +43,15 @@ web/
       filemanager.py     — File storage with deduplication
     tests/               — 20 test files, 100+ test methods
   adapters/
+    registry.py          — Adapter registry (REPO_ADAPTERS, FILE_ADAPTERS dicts)
     repo/
-      base_repo.py       — Base repo adapter (subprocess execution)
+      base_repo.py       — Base repo adapter (subprocess execution, shell=False)
       deb_repo.py        — Debian repo metadata generation
       rpm_repo.py        — RPM repo metadata generation
       generic_repo.py    — Generic file repo (minimal)
       fallback_tools.py  — Pure-Python fallbacks (OpenWrt)
     file/
-      base_adapter.py    — Base file adapter (NOT abstract — should be)
+      base_adapter.py    — Abstract base file adapter (abc.ABC)
       deb_adapter.py     — .deb metadata parsing
       rpm_adapter.py     — .rpm metadata parsing
       file_adapter.py    — Generic file handling
@@ -110,13 +111,14 @@ Auth: `Authorization: Token <key>` (DRF TokenAuthentication).
 
 ### Architecture
 
-5. **File adapters not abstract** — `base_adapter.py` methods return `None` silently
-   instead of using `abc.ABC` + `@abstractmethod`.
+5. **~~File adapters not abstract~~** — ✅ RESOLVED: `base_adapter.py` converted to
+   `abc.ABC` with `@abstractmethod`. All subclasses call `super().__init__()`.
 
-6. **Constructor signature mismatch** — `deb_adapter.py` takes `(filepath)` but base
-   declares `(filepath, original_filename)` — LSP violation.
+6. **~~Constructor signature mismatch~~** — ✅ RESOLVED: All file adapter constructors
+   now accept `(filepath, original_filename=None)` matching the base class.
 
-7. **No adapter registry** — `if/elif` chains for adapter dispatch.
+7. **~~No adapter registry~~** — ✅ RESOLVED: `adapters/registry.py` provides
+   `REPO_ADAPTERS` and `FILE_ADAPTERS` dicts. Factory functions use registry lookup.
 
 8. **~~No subprocess timeout~~** — ✅ RESOLVED: 600-second timeout on all subprocess calls.
 

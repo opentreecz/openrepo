@@ -19,9 +19,8 @@ from .base_adapter import RepoFileAdapter
 
 
 class GenericFileAdapter(RepoFileAdapter):
-    def __init__(self, filepath, original_filename):
-        self.filepath = filepath
-        self.original_filename = original_filename
+    def __init__(self, filepath, original_filename=None):
+        super().__init__(filepath, original_filename)
 
     def get_name(self):
         return self.original_filename

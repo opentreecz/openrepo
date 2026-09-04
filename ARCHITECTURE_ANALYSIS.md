@@ -89,21 +89,25 @@
 
 ## Adapter Pattern Issues
 
-### File Adapters (`web/adapters/file/`)
+### File Adapters (`web/adapters/file/`) — ✅ RESOLVED
 
-- `base_adapter.py` is NOT abstract — methods log warnings and return `None`
-- `deb_adapter.py` constructor takes `(filepath)` only — base declares `(filepath, original_filename)`
+- ~~`base_adapter.py` is NOT abstract~~ — ✅ Converted to `abc.ABC` with `@abstractmethod`
+- ~~`deb_adapter.py` constructor signature mismatch~~ — ✅ All constructors accept `(filepath, original_filename=None)`, call `super().__init__()`
 - `deb_adapter.py:30` accesses private API: `pkg._sections["Package"]`
-- `rpm_adapter.py` has leftover commented-out code
+- ~~`rpm_adapter.py` has leftover commented-out code~~ — ✅ Cleaned up
 
-### Repo Adapters (`web/adapters/repo/`)
+### Repo Adapters (`web/adapters/repo/`) — mostly resolved
 
-- `base_repo.py:140,148` raises bare `Exception` — should be `NotImplementedError`
+- ~~`base_repo.py:140,148` raises bare `Exception`~~ — ✅ Changed to `NotImplementedError`
 - ~~`base_repo.py:184` uses `shell=True`~~ — ✅ RESOLVED: `shell=False` with argument lists
 - ~~No subprocess timeout~~ — ✅ RESOLVED: 600-second timeout
-- `rpm_repo.py:176-191` duplicates `_copy_packages` logic from base
+- ~~`rpm_repo.py:176-191` duplicates `_copy_packages` logic~~ — ✅ Merged into base class `_copy_packages(packages=)` parameter
 - `deb_repo.py:51-55` and `deb_repo.py:62-65` compute architecture list independently
 - `use_python_tools` checked via env var at call-time — should be constructor-time
+
+### Adapter Registry (`web/adapters/registry.py`) — ✅ NEW
+
+- ~~`if/elif` chains for adapter dispatch~~ — ✅ Replaced with `REPO_ADAPTERS` and `FILE_ADAPTERS` dict-based lookup
 
 ### Retention Logic (`web/repo/api/retention.py`)
 

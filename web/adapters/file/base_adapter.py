@@ -12,26 +12,36 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-import logging
-
-logger = logging.getLogger("openrepo_web")
+from abc import ABC, abstractmethod
 
 
-class RepoFileAdapter:
-    def __init__(self, filepath, original_filename):
-        pass
+class RepoFileAdapter(ABC):
+    """Base class for package file metadata adapters.
 
+    Subclasses parse format-specific metadata (name, version, architecture,
+    etc.) from an uploaded package file.
+    """
+
+    def __init__(self, filepath, original_filename=None):
+        self.filepath = filepath
+        self.original_filename = original_filename
+
+    @abstractmethod
     def get_name(self):
-        logger.warning("This function should never be called directly, only subclasses")
+        """Return the package name."""
 
+    @abstractmethod
     def get_architecture(self):
-        logger.warning("This function should never be called directly, only subclasses")
+        """Return the package architecture string."""
 
+    @abstractmethod
     def get_version(self):
-        logger.warning("This function should never be called directly, only subclasses")
+        """Return the package version string."""
 
+    @abstractmethod
     def get_description(self):
-        logger.warning("This function should never be called directly, only subclasses")
+        """Return the package description."""
 
+    @abstractmethod
     def get_builddate(self):
-        logger.warning("This function should never be called directly, only subclasses")
+        """Return the package build date (datetime or None)."""

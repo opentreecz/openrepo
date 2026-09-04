@@ -14,20 +14,19 @@
 
 import logging
 
-from .deb_adapter import DebFileAdapter
-from .file_adapter import GenericFileAdapter
-from .rpm_adapter import RpmFileAdapter
+from .deb_adapter import DebFileAdapter  # noqa: F401
+from .file_adapter import GenericFileAdapter  # noqa: F401
+from .rpm_adapter import RpmFileAdapter  # noqa: F401
 
 logger = logging.getLogger("openrepo_web")
 
 
 def create_adapter(repo_type, filepath, original_filename):
-    if repo_type == "deb":
-        return DebFileAdapter(filepath)
-    elif repo_type == "rpm":
-        return RpmFileAdapter(filepath)
-    elif repo_type == "files":
-        return GenericFileAdapter(filepath, original_filename)
-    else:
+    """Return the appropriate file adapter for the given repo type."""
+    from adapters.registry import FILE_ADAPTERS
+
+    adapter_cls = FILE_ADAPTERS.get(repo_type)
+    if adapter_cls is None:
         logger.warning(f"Unable to determine file adapter from repo type {repo_type}")
         return None
+    return adapter_cls(filepath, original_filename)

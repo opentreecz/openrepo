@@ -108,7 +108,7 @@ class RpmRepoAdapter(BaseRepoAdapter):
 
             # Symlink arch-specific packages into the arch directory
             arch_packages = [p for p in self.packages if p.architecture == arch]
-            self._symlink_packages_to_dir(arch_packages + noarch_packages, arch_dir)
+            self._copy_packages(arch_dir, packages=arch_packages + noarch_packages)
 
             if use_python_tools:
                 from .fallback_tools import generate_rpm_repodata
@@ -185,19 +185,3 @@ class RpmRepoAdapter(BaseRepoAdapter):
 
         return self._execute_commands(exec_commands, repo_path)
 
-    def _symlink_packages_to_dir(self, packages, dest_dir):
-        """Symlink a list of packages into a destination directory."""
-        for package in packages:
-            src_path = os.path.join(settings.STORAGE_PATH, package.relative_path())
-            ext = os.path.splitext(package.filename)[1]
-            dest_name = f"{package.package_name}_{package.version}_{package.architecture}{ext}"
-            dst_path = os.path.join(dest_dir, dest_name)
-
-            if not os.path.isfile(src_path):
-                logger.warning(f"Unable to find source package file {src_path}")
-                continue
-
-            if os.path.lexists(dst_path):
-                os.unlink(dst_path)
-
-            os.symlink(src_path, dst_path)

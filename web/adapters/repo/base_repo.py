@@ -79,10 +79,17 @@ class BaseRepoAdapter:
         # setup_repo() will re-assign this before repo generation.
         self.packages = Package.objects.filter(repo__repo_uid=self.repo_uid)
 
-    def _copy_packages(self, dest_dir):
+    def _copy_packages(self, dest_dir, packages=None):
+        """Symlink packages into *dest_dir*.
 
-        with self._buildlog_section(f"Symlinking {len(self.packages)} packages") as log_entry:
-            for package in self.packages:
+        If *packages* is ``None``, ``self.packages`` is used (the full
+        package set for this repo).
+        """
+        if packages is None:
+            packages = self.packages
+
+        with self._buildlog_section(f"Symlinking {len(packages)} packages") as log_entry:
+            for package in packages:
                 src_sym = os.path.join(settings.STORAGE_PATH, package.relative_path())
                 ext = os.path.splitext(package.filename)[1]
                 pool_name = f"{package.package_name}_{package.version}_{package.architecture}{ext}"
@@ -137,7 +144,7 @@ class BaseRepoAdapter:
         :param repo_path: The path to the repo folder to generate the metadata
         :return:
         """
-        raise Exception("This function should always be implemented in child class for a particular repo")
+        raise NotImplementedError("Subclasses must implement _generate_repo_structure()")
 
     def _get_repo_instructions(self):
         """
@@ -145,7 +152,7 @@ class BaseRepoAdapter:
         to configure the repo.
         :return:
         """
-        raise Exception("This function should always be implemented in child class for a particular repo")
+        raise NotImplementedError("Subclasses must implement _get_repo_instructions()")
 
     def _clean_old_dirs(self, cur_repo_dir):
 

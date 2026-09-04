@@ -603,57 +603,29 @@ class BackgroundWorkerRunLoopTestCase(APITestCase):
 
 
 class BaseFileAdapterTestCase(APITestCase):
-    """Test the base RepoFileAdapter stubs."""
+    """Test the base RepoFileAdapter ABC."""
 
-    def test_base_adapter_get_name_logs_warning(self):
-        """RepoFileAdapter.get_name logs a warning"""
-        import logging
-
+    def test_base_adapter_cannot_be_instantiated(self):
+        """RepoFileAdapter is abstract and cannot be instantiated directly"""
         from adapters.file.base_adapter import RepoFileAdapter
 
-        adapter = RepoFileAdapter("/path", "file")
-        with self.assertLogs("openrepo_web", level=logging.WARNING):
-            adapter.get_name()
+        with self.assertRaises(TypeError):
+            RepoFileAdapter("/path", "file")
 
-    def test_base_adapter_get_architecture_logs_warning(self):
-        """RepoFileAdapter.get_architecture logs a warning"""
-        import logging
-
+    def test_base_adapter_stores_filepath_and_filename(self):
+        """Concrete subclass inherits filepath and original_filename from base"""
         from adapters.file.base_adapter import RepoFileAdapter
 
-        adapter = RepoFileAdapter("/path", "file")
-        with self.assertLogs("openrepo_web", level=logging.WARNING):
-            adapter.get_architecture()
+        class StubAdapter(RepoFileAdapter):
+            def get_name(self): return "n"
+            def get_architecture(self): return "a"
+            def get_version(self): return "v"
+            def get_description(self): return "d"
+            def get_builddate(self): return None
 
-    def test_base_adapter_get_version_logs_warning(self):
-        """RepoFileAdapter.get_version logs a warning"""
-        import logging
-
-        from adapters.file.base_adapter import RepoFileAdapter
-
-        adapter = RepoFileAdapter("/path", "file")
-        with self.assertLogs("openrepo_web", level=logging.WARNING):
-            adapter.get_version()
-
-    def test_base_adapter_get_description_logs_warning(self):
-        """RepoFileAdapter.get_description logs a warning"""
-        import logging
-
-        from adapters.file.base_adapter import RepoFileAdapter
-
-        adapter = RepoFileAdapter("/path", "file")
-        with self.assertLogs("openrepo_web", level=logging.WARNING):
-            adapter.get_description()
-
-    def test_base_adapter_get_builddate_logs_warning(self):
-        """RepoFileAdapter.get_builddate logs a warning"""
-        import logging
-
-        from adapters.file.base_adapter import RepoFileAdapter
-
-        adapter = RepoFileAdapter("/path", "file")
-        with self.assertLogs("openrepo_web", level=logging.WARNING):
-            adapter.get_builddate()
+        adapter = StubAdapter("/path/to/file", "original.deb")
+        self.assertEqual(adapter.filepath, "/path/to/file")
+        self.assertEqual(adapter.original_filename, "original.deb")
 
 
 class URLRoutingValidationTestCase(APITestCase):
