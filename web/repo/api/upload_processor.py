@@ -9,11 +9,16 @@ from adapters.file import create_adapter
 from repo.constants import is_known_architecture
 from repo.models import Package, UploadTask
 
+from .errors import ApiErrorCode
 from .retention import apply_retention_policy
 from .serializers import PackageDetailSerializer
 from .util import compute_sha512
 
 logger = logging.getLogger("openrepo_web")
+
+
+class PackageExistsError(Exception):
+    """Raised when a package already exists and overwrite is not requested."""
 
 
 def process_upload(task_id):
@@ -56,7 +61,7 @@ def process_upload(task_id):
                     version=file_info_adapter.get_version(),
                 ).delete()
             else:
-                raise ValueError(
+                raise PackageExistsError(
                     f"Package {file_info_adapter.get_name()} version {file_info_adapter.get_version()} "
                     f"already exists in destination repo {repo.repo_uid} and 'overwrite' is not specified"
                 )
@@ -109,7 +114,9 @@ def process_upload(task_id):
                 os.remove(full_stored_filepath)
             except OSError:
                 pass
+        error_code = ApiErrorCode.PACKAGE_EXISTS if isinstance(e, PackageExistsError) else ""
         task.status = "failed"
         task.error_message = str(e)
+        task.error_code = error_code
         task.completed_at = datetime.now(tz=timezone.utc)
-        task.save(update_fields=["status", "error_message", "completed_at"])
+        task.save(update_fields=["status", "error_message", "error_code", "completed_at"])

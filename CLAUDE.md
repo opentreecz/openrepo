@@ -6,7 +6,7 @@ OpenRepo is a web-based package repository management server for hosting Debian
 APT (.deb), RPM YUM/DNF (.rpm), and generic file repositories. It provides PGP
 signing, retention policies, user access control, a REST API, and a web UI.
 
-- **Backend:** Python 3 / Django 4.2 / Django REST Framework 3.15
+- **Backend:** Python 3 / Django 4.2 / Django REST Framework 3.15 / drf-spectacular (OpenAPI 3.0)
 - **Frontend:** Vue.js 3 + TypeScript + Vuetify 3 + Vite
 - **Database:** PostgreSQL 16 (production) or SQLite (development)
 - **Web server:** Nginx (reverse proxy)
@@ -77,6 +77,8 @@ cli/
 | 10 | `/api/upload-status/{task_id}/` | GET | Yes |
 | 11 | `/api/builds/` | GET | No |
 | 12 | `/api/buildlogs/` | GET | No |
+| 13 | `/api/schema/` | GET | No (public) |
+| 14 | `/api/docs/` | GET | No (public) |
 
 Auth: `Authorization: Token <key>` (DRF TokenAuthentication).
 
@@ -114,15 +116,15 @@ Auth: `Authorization: Token <key>` (DRF TokenAuthentication).
 
 ### API Contract
 
-11. **No OpenAPI spec** — No machine-readable API contract.
+11. **~~No OpenAPI spec~~** — ✅ RESOLVED: `drf-spectacular` added, schema at `/api/schema/`, Swagger UI at `/api/docs/`
 
 12. **No API versioning** — Single unversioned `/api/` path.
 
-13. **Serializer/response mismatches** — 4 views declare wrong `serializer_class`:
-    - `UploadViewSet`: declares `UploadSerializer`, returns `{"task_id": str}`
-    - `CopyViewSet`: declares `CopySerializer`, returns `PackageDetailSerializer`
-    - `PGPKeysViewSet.create()`: returns empty body
-    - `PGPKeysViewSet.download()`: returns raw binary
+13. **~~Serializer/response mismatches~~** — ✅ RESOLVED: `@extend_schema` decorators added to fix:
+    - `UploadViewSet`: `UploadResponseSerializer` for 202 response
+    - `CopyViewSet`: `PackageDetailSerializer` for response
+    - `PGPKeysViewSet.create()`: `PGPKeyCreateRequestSerializer` for request, empty 201 response
+    - `PGPKeysViewSet.download()`: binary response annotation
 
 14. **PAGE_SIZE=2000 > max_page_size=500** — Default page exceeds max.
 

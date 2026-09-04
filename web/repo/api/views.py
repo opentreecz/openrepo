@@ -24,6 +24,8 @@ from django.core.validators import validate_email
 from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -33,16 +35,20 @@ from repo.models import Build, BuildLogLine, Package, PGPSigningKey, Repository,
 from repo.storage.filemanager import RepoFileManager
 from repo.storage.keyring import PGPKeyring
 
+from .errors import ApiErrorCode, api_error
 from .filters import BuildFilter, BuildLogFilter
 from .serializers import (
     BuildLogSerializer,
     BuildSerializer,
     CopySerializer,
+    ErrorResponseSerializer,
     PackageDetailSerializer,
     PackageSummarySerializer,
+    PGPKeyCreateRequestSerializer,
     PGPKeySerializer,
     RepoDetailSerializer,
     RepoSummarySerializer,
+    UploadResponseSerializer,
     UploadSerializer,
     UploadTaskSerializer,
     UserDetailSerializer,
@@ -93,6 +99,11 @@ class PGPKeysViewSet(viewsets.ModelViewSet):
 
     lookup_field = "fingerprint"
 
+    @extend_schema(
+        request=PGPKeyCreateRequestSerializer,
+        responses={201: None},
+        description="Generate a new PGP signing key pair.",
+    )
     def create(self, request, *args, **kwargs):
 
         full_name = request.POST.get("name")
@@ -117,9 +128,10 @@ class PGPKeysViewSet(viewsets.ModelViewSet):
         referencing_repos = Repository.objects.filter(signing_key=instance)
         if len(referencing_repos) > 0:
             repos = [repo.repo_uid for repo in referencing_repos]
-            return Response(
-                status=rest_framework.status.HTTP_400_BAD_REQUEST,
-                data={"detail": "Unable to delete.  You must first remove this key from repos: " + ", ".join(repos)},
+            return api_error(
+                ApiErrorCode.KEY_IN_USE,
+                "Unable to delete. You must first remove this key from repos: " + ", ".join(repos),
+                rest_framework.status.HTTP_409_CONFLICT,
             )
 
         keyring = PGPKeyring()
@@ -128,6 +140,10 @@ class PGPKeysViewSet(viewsets.ModelViewSet):
         self.perform_destroy(instance)
         return Response(status=rest_framework.status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(
+        responses={(200, "application/pgp-keys"): OpenApiTypes.BINARY},
+        description="Download the public PGP key in ASCII-armored format.",
+    )
     @action(detail=True, methods=["get"])
     def download(self, request, fingerprint=None):
         key = self.get_object()
@@ -243,6 +259,11 @@ class BuildLogViewSet(rest_framework.mixins.ListModelMixin, viewsets.GenericView
 class CopyViewSet(viewsets.ViewSet):
     serializer_class = CopySerializer
 
+    @extend_schema(
+        request=CopySerializer,
+        responses={200: PackageDetailSerializer, 409: ErrorResponseSerializer},
+        description="Copy a package to another repository.",
+    )
     def create(self, request, repo_uid, package_uid):
         try:
             src_repo = Repository.objects.get(repo_uid=repo_uid)
@@ -284,14 +305,18 @@ class CopyViewSet(viewsets.ViewSet):
             version=package.version,
             architecture=package.architecture,
         ).count() > 0:
-            raise rest_framework.exceptions.ParseError(
+            return api_error(
+                ApiErrorCode.PACKAGE_EXISTS,
                 f"Package {package.package_name} v{package.version} ({package.architecture}) "
-                f"already exists in destination repo {dst_repo}"
+                f"already exists in destination repo {dst_repo}",
+                rest_framework.status.HTTP_409_CONFLICT,
             )
 
         if Package.objects.filter(repo=dst_repo, package_uid=package.package_uid):
-            raise rest_framework.exceptions.ParseError(
-                f"An identical package already exists in the destination repo {package.package_uid}"
+            return api_error(
+                ApiErrorCode.PACKAGE_EXISTS,
+                f"An identical package already exists in the destination repo {package.package_uid}",
+                rest_framework.status.HTTP_409_CONFLICT,
             )
 
         # Set "pk" to none in order to make the save create a new model
@@ -309,6 +334,14 @@ class CopyViewSet(viewsets.ViewSet):
 class UploadViewSet(viewsets.ViewSet):
     serializer_class = UploadSerializer
 
+    @extend_schema(
+        request={"multipart/form-data": UploadSerializer},
+        responses={202: UploadResponseSerializer, 409: ErrorResponseSerializer},
+        description=(
+            "Upload a package file. Returns a task ID for async status polling. "
+            "Returns 409 if the package already exists and overwrite is not set."
+        ),
+    )
     def create(self, request, repo_uid):
         try:
             repo = Repository.objects.get(repo_uid=repo_uid)

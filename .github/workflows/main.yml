@@ -52,6 +52,10 @@ jobs:
           coverage report --show-missing --fail-under=85
           coverage xml -o coverage.xml
 
+      - name: Validate OpenAPI schema
+        working-directory: web
+        run: python manage.py spectacular --validate --fail-on-warn
+
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v5

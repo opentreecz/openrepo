@@ -31,39 +31,87 @@ Docker dependency.
 
 ### 1.1 OpenAPI Specification (this repo)
 
-**Goal:** Generate a machine-readable API contract from the existing DRF views.
+**Goal:** Generate a machine-readable API contract from the existing DRF views
+using `drf-spectacular`. Expose schema + Swagger UI endpoints. Fix all known
+serializer/response mismatches. Update all documentation across both repos.
 
-**Files to change:**
+#### Code Changes (8 files in this repo)
 
-| File | Change |
-|------|--------|
-| `web/requirements.txt` | Add `drf-spectacular>=0.27` |
-| `web/openrepo/settings.py` | Add `drf-spectacular` to `INSTALLED_APPS`, configure `SPECTACULAR_SETTINGS`, set `DEFAULT_SCHEMA_CLASS` |
-| `web/openrepo/urls.py` | Add `/api/schema/` (YAML) and `/api/docs/` (Swagger UI) endpoints |
-| `web/repo/api/views.py` | Add `@extend_schema()` decorators to fix 4 mismatched views |
-| `web/repo/api/serializers.py` | Add `UploadResponseSerializer`, add `@extend_schema_field` for `result_data` |
+| # | File | Change |
+|---|------|--------|
+| 1 | `web/requirements.txt` | Add `drf-spectacular==0.28.0` |
+| 2 | `web/openrepo/settings.py` | Add `"drf_spectacular"` to `INSTALLED_APPS`; add `DEFAULT_SCHEMA_CLASS` to `REST_FRAMEWORK`; add `SPECTACULAR_SETTINGS` with `TITLE`, `VERSION`, `COMPONENT_SPLIT_REQUEST: True` |
+| 3 | `web/openrepo/urls.py` | Add `/api/schema/` (raw YAML/JSON) and `/api/docs/` (Swagger UI) URL patterns |
+| 4 | `web/repo/api/serializers.py` | Add `UploadResponseSerializer` (task_id field), `PGPKeyCreateRequestSerializer` (name, email fields), `@extend_schema_field` on `UploadTaskSerializer.result_data` |
+| 5 | `web/repo/api/views.py` | Add `@extend_schema` decorators on 4-6 views (see table below); add imports |
+| 6 | `web/repo/tests/test_openapi.py` | **New file** — test schema endpoint, validate contents (~40 lines) |
+| 7 | `.github/workflows/main.yml` | Add `python manage.py spectacular --validate --fail-on-warn` CI step |
+| 8 | `web/dev-requirements.txt` | Add `pyyaml` if needed for test schema parsing |
 
-**View fixes needed:**
+#### View Fixes
 
 | View | Problem | Fix |
 |------|---------|-----|
-| `UploadViewSet.create()` | `serializer_class = UploadSerializer` but response is `{"task_id": str}` | Create `UploadResponseSerializer`, add `@extend_schema(request=UploadSerializer, responses={202: UploadResponseSerializer})` |
-| `CopyViewSet.create()` | `serializer_class = CopySerializer` but response is `PackageDetailSerializer` | Add `@extend_schema(request=CopySerializer, responses={200: PackageDetailSerializer})` |
-| `PGPKeysViewSet.create()` | Returns empty 201 body | Add `@extend_schema(responses={201: None})` |
-| `PGPKeysViewSet.download()` | Returns raw `HttpResponse` with `application/pgp-keys` | Add `@extend_schema(responses={(200, "application/pgp-keys"): bytes})` |
+| `UploadViewSet.create()` | `serializer_class = UploadSerializer` but response is `{"task_id": str}` | `@extend_schema(request={"multipart/form-data": UploadSerializer}, responses={202: UploadResponseSerializer})` |
+| `CopyViewSet.create()` | `serializer_class = CopySerializer` but response is `PackageDetailSerializer` | `@extend_schema(request=CopySerializer, responses={200: PackageDetailSerializer})` |
+| `PGPKeysViewSet.create()` | Returns empty 201 body | `@extend_schema(request=PGPKeyCreateRequestSerializer, responses={201: None})` |
+| `PGPKeysViewSet.download()` | Returns raw `HttpResponse` binary | `@extend_schema(responses={(200, "application/pgp-keys"): OpenApiTypes.BINARY})` |
+| `ReposViewSet.create()` | `get_serializer_class()` may confuse generator | Verify; add `@extend_schema` if needed |
+| `WhoAmIViewSet.retrieve()` | No `pk` lookup | Verify; add `@extend_schema` if needed |
 
-**New file:** `web/repo/api/schema.py` — Custom `AutoSchema` subclass if needed.
+#### Documentation Changes (19 files across both repos)
 
-**Validation:** Run `python manage.py spectacular --validate` in CI.
+**Tier 1 — Core API docs (must update):**
 
-**Known inconsistencies to fix:**
-- `UploadSerializer` is declared as `serializer_class` on `UploadViewSet` but never used for deserialization
-- `CopySerializer` is declared but response uses `PackageDetailSerializer`
-- `PGPKeysViewSet.create()` returns empty body but schema would show `PGPKeySerializer`
-- `UploadTask.result_data` is a `JSONField` containing `PackageDetailSerializer` dict — invisible to schema
-- `ReposViewSet.get_serializer_class()` returns different serializers for `create` vs `list` — schema generators may pick wrong one
-- `PAGE_SIZE=2000` exceeds `max_page_size=500` — default page returns 2000 items
-- Browsable API renderer is active (both JSON and HTML)
+| File | Changes |
+|------|---------|
+| `docs/api.md` (this repo) | Add "Interactive API Documentation" section at top linking to `/api/schema/` and `/api/docs/`; add `/api/users/` endpoint (currently undocumented); note `page_size` default vs max |
+| `README.md` (this repo) | Update feature bullet (line 38) to mention OpenAPI/Swagger; add link to `/api/docs/` at top of REST API section (line 184); add schema validation to Quality Checks (line 93) |
+| `docs/api.md` (openrepo-sync) | Add note at top linking to server's OpenAPI spec; resolve all 5 "Open Questions" (lines 295-303) |
+
+**Tier 2 — Developer docs (should update):**
+
+| File | Changes |
+|------|---------|
+| `CONTRIBUTING.md` (this repo) | Expand "Update documentation" (line 93); update architecture (line 222); update "Related Projects" (line 255) |
+| `docs/development.md` (this repo) | Add `drf-spectacular` to tech stack table; add schema validation to test commands; update CI table; add Swagger UI URL to dev setup |
+| `CLAUDE.md` (this repo) | Add `drf-spectacular` to stack; add 2 new endpoints to table; mark issue #11 resolved; update #13 |
+| `ARCHITECTURE_ANALYSIS.md` (this repo) | Mark serializer mismatches resolved; update manual response notes; add new routes |
+| `DEVELOPMENT_PLAN.md` (this repo) | Mark 1.1 as completed |
+| `DEVELOPMENT_PLAN.md` (openrepo-sync) | Mark 1.1 as completed |
+| `CLAUDE.md` (openrepo-sync) | Add note about OpenAPI spec; update known issue #5 |
+| `ARCHITECTURE_ANALYSIS.md` (openrepo-sync) | Note hardcoded URLs can be validated against spec; note field contracts documented |
+
+**Tier 3 — Minor cross-references (8 files):**
+
+| File | Changes |
+|------|---------|
+| `docs/index.md` (this repo) | Update features table and documentation nav |
+| `docs/features.md` (this repo) | Add API docs links in async uploads and build log sections |
+| `docs/getting-started.md` (this repo) | Add brief mention of `/api/docs/` |
+| `docs/architecture-guide.md` (this repo) | Add link to OpenAPI spec in API example section |
+| `docs/cli.md` (this repo) | Add link to OpenAPI spec in architecture section |
+| `README.md` (openrepo-sync) | Update "Requires" callout to mention `/api/docs/` |
+| `CONTRIBUTING.md` (openrepo-sync) | Add row to "What to update" table for API changes |
+| `docs/configuration.md` (openrepo-sync) | Add API docs link after API key mention |
+
+#### Known Inconsistencies Being Fixed
+
+- `UploadSerializer` declared but never used for deserialization → `@extend_schema` override
+- `CopySerializer` declared but response uses `PackageDetailSerializer` → `@extend_schema` override
+- `PGPKeysViewSet.create()` returns empty body → `@extend_schema(responses={201: None})`
+- `UploadTask.result_data` is opaque `JSONField` → `@extend_schema_field` annotation
+- `ReposViewSet.get_serializer_class()` returns different serializers per action → verify drf-spectacular handles it
+- `PAGE_SIZE=2000` exceeds `max_page_size=500` → document as-is, fix in Phase 4.8
+- Browsable API renderer active → document as-is
+
+#### Verification
+
+1. `python manage.py test repo.tests` — all existing + new tests pass
+2. `python manage.py spectacular --validate --fail-on-warn` — schema validates
+3. `python manage.py spectacular --file /tmp/schema.yaml` — inspect generated schema
+4. `flake8 --config=.flake8 .` — lint passes
+5. Visit `/api/docs/` — Swagger UI renders correctly with all endpoints
 
 ### 1.2 API Versioning (this repo)
 

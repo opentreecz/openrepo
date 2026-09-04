@@ -190,6 +190,9 @@ class UploadTask(models.Model):
     stored_path = models.CharField(max_length=65536)
     sha512 = models.CharField(max_length=512, blank=True)
     error_message = models.TextField(blank=True)
+    # Machine-readable error code set when status="failed" (e.g. "PACKAGE_EXISTS").
+    # Empty string means a generic/unclassified failure.
+    error_code = models.CharField(max_length=64, blank=True, default="")
     result_data = models.JSONField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)

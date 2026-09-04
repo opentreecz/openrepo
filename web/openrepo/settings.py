@@ -89,6 +89,7 @@ INSTALLED_APPS = [
     "repo",
     "rest_framework",
     "rest_framework.authtoken",
+    "drf_spectacular",
 ]
 
 MIDDLEWARE = [
@@ -220,6 +221,24 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "repo.api.pagination.OpenRepoPagination",
     "PAGE_SIZE": 2000,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "EXCEPTION_HANDLER": "repo.api.exception_handler.openrepo_exception_handler",
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "OpenRepo API",
+    "DESCRIPTION": "Package repository management API for Debian APT, RPM, and generic repositories.",
+    "VERSION": "2.5.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "TAGS": [
+        {"name": "repos", "description": "Repository management"},
+        {"name": "packages", "description": "Package listing and details"},
+        {"name": "upload", "description": "Package upload and status"},
+        {"name": "signing-keys", "description": "PGP signing key management"},
+        {"name": "builds", "description": "Build history and logs"},
+        {"name": "auth", "description": "Authentication and user info"},
+    ],
 }
 
 LOGGING = {

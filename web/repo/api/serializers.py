@@ -207,9 +207,28 @@ class CopySerializer(serializers.Serializer):
 
 class UploadSerializer(serializers.Serializer):
     package_file = serializers.FileField()
+    overwrite = serializers.CharField(required=False, help_text='Set to "1", "true", or "yes" to overwrite existing.')
 
     class Meta:
-        fields = ["package_file"]
+        fields = ["package_file", "overwrite"]
+
+
+class UploadResponseSerializer(serializers.Serializer):
+    """Response returned by the upload endpoint (HTTP 202 Accepted)."""
+    task_id = serializers.UUIDField(help_text="ID for polling upload status via /api/upload-status/<task_id>/")
+
+
+class ErrorResponseSerializer(serializers.Serializer):
+    """Standard error envelope returned by all API error responses."""
+    code = serializers.CharField(help_text="Machine-readable error code (e.g. PACKAGE_EXISTS)")
+    detail = serializers.CharField(help_text="Human-readable error description")
+    status = serializers.IntegerField(help_text="HTTP status code")
+
+
+class PGPKeyCreateRequestSerializer(serializers.Serializer):
+    """Request body for generating a new PGP signing key."""
+    name = serializers.CharField(help_text="Full name for the PGP key (1-1024 characters)")
+    email = serializers.EmailField(help_text="Email address for the PGP key")
 
 
 class UploadTaskSerializer(serializers.ModelSerializer):
@@ -222,6 +241,7 @@ class UploadTaskSerializer(serializers.ModelSerializer):
             "filename",
             "filesize",
             "error_message",
+            "error_code",
             "result_data",
             "created_at",
             "completed_at",
