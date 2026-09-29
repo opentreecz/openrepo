@@ -219,16 +219,16 @@ achieve RCE.
 
 ## Phase 2: Architecture Cleanup (Weeks 3–5)
 
-### 2.1 Implement PackageSource Trait (Client)
+### ✅ 2.1 Implement PackageSource Trait (Client)
 
 Replace dead trait + manual `match` dispatch with proper trait-object dispatch.
 
-### 2.2 Extract Shared GPG Module (Client)
+### ✅ 2.2 Extract Shared GPG Module (Client)
 
 Deduplicate ~200 lines of GPG verification from `deb_repo.rs` and `rpm_repo.rs`
 into `src/gpg.rs`.
 
-### 2.3 Share reqwest::Client (Client)
+### ✅ 2.3 Share reqwest::Client (Client)
 
 Single HTTP client with shared connection pool. Remove 5 duplicate
 `Client::builder()` calls.
@@ -254,8 +254,8 @@ circular dependencies.
 
 | Duplication | Strategy | Status |
 |-------------|----------|--------|
-| GPG verification (~200 lines, client) | Extract to `src/gpg.rs` | Pending |
-| `reqwest::Client` (6 places, client) | Pass shared client | Pending |
+| GPG verification (~200 lines, client) | Extract to `src/gpg.rs` | ✅ Done |
+| `reqwest::Client` (6 places, client) | Pass shared client | ✅ Done |
 | `_symlink_packages_to_dir` vs `_copy_packages` (server) | Merge into base class | ✅ Done |
 | Architecture resolution in deb adapter (server) | Extract and reuse | Trivial |
 | Test setUp boilerplate (server, 20 files) | Extract shared fixtures module | Medium |
@@ -297,8 +297,8 @@ New `tests/e2e/` with Rust integration tests behind `#[cfg(feature = "e2e")]`.
 | Gap | Severity |
 |-----|----------|
 | No RPM upload integration test | Medium |
-| No API pagination test | Medium |
-| No generic repo adapter test | Low |
+| ~~No API pagination test~~ | ✅ Done |
+| ~~No generic repo adapter test~~ | ✅ Done |
 | No concurrent upload test | Low |
 | No promote workflow API test | Medium |
 | No shared test fixtures | Medium |
@@ -322,11 +322,11 @@ New `tests/e2e/` with Rust integration tests behind `#[cfg(feature = "e2e")]`.
 
 ## Phase 4: Observability & Hardening (Weeks 7–9)
 
-### 4.1 Health Check Endpoint (this repo)
+### ✅ 4.1 Health Check Endpoint (this repo)
 
 `GET /api/health/` — no auth, returns `{"status": "ok", "database": "ok", "worker": "ok|stale|unknown", "version": "2.5.0"}`.
 
-### 4.2 Structured Logging (this repo)
+### ✅ 4.2 Structured Logging (this repo)
 
 Add `structlog` with JSON output, correlation IDs, request tracing.
 
@@ -338,12 +338,12 @@ Add `django-prometheus` with custom metrics:
 - `openrepo_build_duration_seconds` (Histogram)
 - `openrepo_retention_deleted_total` (Counter)
 
-### 4.4 PGP Key Encryption at Rest (this repo)
+### ✅ 4.4 PGP Key Encryption at Rest (this repo)
 
 Fernet encryption for `private_key_pem` and `passphrase` fields.
 Data migration to encrypt existing keys.
 
-### 4.5 Rate Limiting (this repo)
+### ✅ 4.5 Rate Limiting (this repo)
 
 DRF throttling: 100 req/min user, 20 req/min upload.
 
@@ -352,14 +352,14 @@ DRF throttling: 100 req/min user, 20 req/min upload.
 Client sends SHA-256 with upload; server verifies on receipt.
 Add `checksum_sha256` field to `Package` model.
 
-### 4.7 Retention Logic Fix (this repo)
+### ✅ 4.7 Retention Logic Fix (this repo)
 
 - Wrap `apply_retention_policy` in `transaction.atomic()`
 - Fix N+1 query with `annotate()` + `Subquery`
 - Add DB constraint: `retention_keep_count` required when policy includes `keep_latest_n`
 - Note: `keep_latest_n_and_age` uses union semantics (OR), not intersection (AND) — name is misleading
 
-### 4.8 Pagination Fix (this repo)
+### ✅ 4.8 Pagination Fix (this repo)
 
 Change `PAGE_SIZE` from 2000 to 500 to match `max_page_size`.
 
@@ -382,9 +382,9 @@ Phase 1 (Weeks 1-3): Foundation ✅ COMPLETE
        └── 1.5f Upload status authz ✅
 
 Phase 2 (Weeks 3-5): Architecture
-  ├── 2.1 PackageSource trait (client)
-  ├── 2.2 GPG module extraction (client)
-  ├── 2.3 Shared reqwest::Client (client)
+  ├── ✅ 2.1 PackageSource trait (client)
+  ├── ✅ 2.2 GPG module extraction (client)
+  ├── ✅ 2.3 Shared reqwest::Client (client)
   ├── 2.4 Fix server adapter abstractions (server) ✅
   ├── 2.5 Adapter registry (server) ✅
   └── 2.6 Remaining deduplication (both) — server ✅, client pending
@@ -398,14 +398,14 @@ Phase 3 (Weeks 5-7): Testing
   └── 3.6 OpenAPI schema validation in CI — depends on 1.1
 
 Phase 4 (Weeks 7-9): Observability & Hardening
-  ├── 4.1 Health check endpoint (server)
-  ├── 4.2 Structured logging (server)
+  ├── ✅ 4.1 Health check endpoint (server)
+  ├── ✅ 4.2 Structured logging (server)
   ├── 4.3 Prometheus metrics (server)
-  ├── 4.4 PGP key encryption (server)
-  ├── 4.5 Rate limiting (server)
+  ├── ✅ 4.4 PGP key encryption (server)
+  ├── ✅ 4.5 Rate limiting (server)
   ├── 4.6 Hash continuity (both)
-  ├── 4.7 Retention logic fix (server)
-  └── 4.8 Pagination fix (server)
+  ├── ✅ 4.7 Retention logic fix (server)
+  └── ✅ 4.8 Pagination fix (server)
 ```
 
 ## File Change Estimate

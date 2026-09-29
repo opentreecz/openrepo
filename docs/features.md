@@ -89,7 +89,7 @@ Assign a signing key to a repository in Repo Settings. On every repo rebuild:
 |---|---|
 | **Debian** | `dists/stable/Release` → `Release.gpg` (detach) + `InRelease` (clearsign) |
 | **RPM** | `repodata/repomd.xml` → `.asc` detached signature |
-| **Generic** | *(not yet implemented)* |
+| **Generic** | Detached GPG signature (`index.html.asc`) + public key export (`public.gpg`) |
 
 The public key is exported to `public.gpg` inside the repo — clients download it to configure trusted sources.
 

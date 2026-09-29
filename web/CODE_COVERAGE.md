@@ -93,7 +93,7 @@ OPENREPO_VAR_DIR=/tmp/openrepo/ coverage run manage.py test repo.tests --verbosi
 | `adapters/repo/base_repo.py` | 136 | 56 | 59% | Uncovered: `setup_repo()` integration path (requires real GPG + apt-ftparchive) |
 | `adapters/file/__init__.py` | 14 | 6 | 57% | Uncovered: `create_adapter` for unknown repo type |
 | `adapters/file/base_adapter.py` | 15 | 6 | 60% | Base class warning methods never called (subclasses override) |
-| `adapters/repo/generic_repo.py` | 7 | 3 | 57% | Uncovered: `_generate_repo_structure` body (no generic repo test fixture) |
+| `adapters/repo/generic_repo.py` | — | — | — | ✅ Tests added in `test_generic_repo.py` |
 | `adapters/repo/__init__.py` | 11 | 3 | 73% | Uncovered: unknown repo type raising `Exception` |
 | `repo/worker/bgworker.py` | 63 | 18 | 71% | Uncovered: `BackgroundWorker.run()` threading loop (by design — tested via direct ChoreList calls) |
 | `manage.py` | 11 | 2 | 82% | Uncovered: `__main__` block |
@@ -143,7 +143,7 @@ OPENREPO_VAR_DIR=/tmp/openrepo/ coverage run manage.py test repo.tests --verbosi
 
 3. **`repo/api/views.py` `UserViewSet` (84%)** — Add tests for user CRUD (list/create/update/delete). Upload validation and multi-architecture copy edge cases are covered by the API test suite.
 
-4. **`adapters/repo/generic_repo.py` (57%)** — Add a test for `GenericRepoAdapter._generate_repo_structure` with mocked `_copy_packages`.
+4. **~~`adapters/repo/generic_repo.py` (57%)~~** — ✅ Done: `test_generic_repo.py` covers HTML index, MD5, PGP signing.
 
 ### Priority 2 — Design Constraints
 
