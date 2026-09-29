@@ -412,3 +412,46 @@ class UploadStatusView(viewsets.ViewSet):
 
         serializer = UploadTaskSerializer(task, context={"request": request})
         return Response(serializer.data)
+
+
+class HealthCheckView(viewsets.ViewSet):
+    """
+    Unauthenticated health check endpoint.
+
+    Returns database connectivity status and the application version.
+    Intended for monitoring systems and load balancer probes.
+    """
+
+    authentication_classes = []
+    permission_classes = []
+
+    @extend_schema(
+        responses={200: {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "example": "ok"},
+                "database": {"type": "string", "example": "ok"},
+                "version": {"type": "string", "example": "2.5.0"},
+                "repos": {"type": "integer", "example": 5},
+                "packages": {"type": "integer", "example": 142},
+            },
+        }},
+    )
+    def retrieve(self, request):
+        from django.db import connection
+
+        db_status = "ok"
+        try:
+            connection.ensure_connection()
+        except Exception:
+            db_status = "unavailable"
+
+        version = getattr(settings, "SPECTACULAR_SETTINGS", {}).get("VERSION", "unknown")
+
+        return Response({
+            "status": "ok" if db_status == "ok" else "degraded",
+            "database": db_status,
+            "version": version,
+            "repos": Repository.objects.count(),
+            "packages": Package.objects.count(),
+        })
