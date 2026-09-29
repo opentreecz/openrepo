@@ -66,7 +66,9 @@ class OpenAPISchemaTest(TestCase):
         from django.core.management import call_command
 
         out = StringIO()
+        err = StringIO()
         # This will raise if validation fails
-        call_command("spectacular", "--validate", stdout=out)
+        call_command("spectacular", "--validate", stdout=out, stderr=err)
         output = out.getvalue()
-        self.assertNotIn("Error", output)
+        # The summary line "Errors: N" is always present; check that N is 0
+        self.assertIn("Errors:   0", output)
