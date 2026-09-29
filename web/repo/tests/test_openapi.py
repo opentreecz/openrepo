@@ -14,7 +14,7 @@ class OpenAPISchemaTest(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_superuser("openapi_admin", "openapi_admin@test.com", "admin")
-        self.token = Token.objects.create(user=self.user)
+        self.token = Token.objects.get(user=self.user)
         self.client = APIClient()
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
 

@@ -151,7 +151,7 @@ class UserViewSetTestCase(APITestCase):
             HTTP_AUTHORIZATION=self.http_auth,
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.json()["username"], "admin")
+        self.assertEqual(resp.json()["username"], "user_crud_admin")
 
     # ── Update (PATCH) ──────────────────────────────────────────────────
 
