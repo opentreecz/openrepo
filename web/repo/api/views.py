@@ -399,6 +399,7 @@ class UploadViewSet(viewsets.ViewSet):
 
 
 class UploadStatusView(viewsets.ViewSet):
+    serializer_class = UploadTaskSerializer
 
     def retrieve(self, request, task_id):
         try:
