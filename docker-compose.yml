@@ -1,11 +1,34 @@
+# =============================================================================
+# OpenRepo — Docker Compose Configuration
+# =============================================================================
+#
+# Quick start:
+#   1. cp .env.example .env && $EDITOR .env     # set OPENREPO_SECRET_KEY
+#   2. docker compose up -d                      # start all services
+#   3. docker compose exec django ./django/manage.py createsuperuser
+#   4. Open http://localhost:7376
+#
+# Architecture:
+#   nginx (8080)  -->  django/gunicorn (8000)  -->  db/postgres (5432)
+#                                               <--  worker (background)
+#
+# All three app containers (nginx, django, worker) use the same Docker
+# image with different commands.  The shared data volume at
+# /var/lib/openrepo holds packages, repo metadata, and GPG keyrings.
+# =============================================================================
+
 services:
+
+  # ---------------------------------------------------------------------------
+  # Nginx — reverse proxy, serves the Vue.js SPA and hosted repo files
+  # ---------------------------------------------------------------------------
   nginx:
     build: .
     image: ghcr.io/opentreecz/openrepo:latest
     command: nginx
     restart: unless-stopped
     ports:
-      - "7376:8080"
+      - "${OPENREPO_PORT:-7376}:8080"
     depends_on:
       django:
         condition: service_healthy
@@ -17,6 +40,9 @@ services:
       timeout: 5s
       retries: 3
 
+  # ---------------------------------------------------------------------------
+  # Django — REST API (Gunicorn + gevent), handles uploads, manages repos
+  # ---------------------------------------------------------------------------
   django:
     build: .
     image: ghcr.io/opentreecz/openrepo:latest
@@ -27,14 +53,21 @@ services:
     volumes:
       - openrepo-data:/var/lib/openrepo
     environment:
-      # - "OPENREPO_CSRF_TRUSTED_ORIGINS=myproxiedname.example.com"   # Multiple domains are space delimited
       - OPENREPO_DB_TYPE=postgresql
-      - OPENREPO_PG_DATABASE=openrepo
-      - OPENREPO_PG_USERNAME=postgres
+      - OPENREPO_PG_DATABASE=${OPENREPO_PG_DATABASE:-openrepo}
+      - OPENREPO_PG_USERNAME=${OPENREPO_PG_USERNAME:-postgres}
       - OPENREPO_PG_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
       - OPENREPO_PG_HOSTNAME=db
-      # OPENREPO_SECRET_KEY is preferred; DJANGO_SECRET_KEY also accepted for compatibility.
+      - OPENREPO_PG_PORT=5432
+      # REQUIRED — server refuses to start without this.
       - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
+      # Optional overrides (uncomment to customize):
+      # - OPENREPO_DEBUG=FALSE
+      # - OPENREPO_DOMAIN=repo.example.com
+      # - OPENREPO_ALLOWED_HOSTS=repo.example.com,repo-internal
+      # - OPENREPO_CSRF_TRUSTED_ORIGINS=https://repo.example.com
+      # - OPENREPO_MAX_UPLOAD_SIZE=2147483648
+      # - OPENREPO_LOGLEVEL=INFO
     depends_on:
       db:
         condition: service_healthy
@@ -45,20 +78,23 @@ services:
       retries: 10
       start_period: 30s
 
+  # ---------------------------------------------------------------------------
+  # Worker — background process for repo rebuilds and retention policy sweeps
+  # ---------------------------------------------------------------------------
   worker:
     build: .
     image: ghcr.io/opentreecz/openrepo:latest
     command: ./django/manage.py runworker
+    restart: unless-stopped
     volumes:
       - openrepo-data:/var/lib/openrepo
-    restart: unless-stopped
     environment:
       - OPENREPO_DB_TYPE=postgresql
-      - OPENREPO_PG_DATABASE=openrepo
-      - OPENREPO_PG_USERNAME=postgres
+      - OPENREPO_PG_DATABASE=${OPENREPO_PG_DATABASE:-openrepo}
+      - OPENREPO_PG_USERNAME=${OPENREPO_PG_USERNAME:-postgres}
       - OPENREPO_PG_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
       - OPENREPO_PG_HOSTNAME=db
-      # OPENREPO_SECRET_KEY is preferred; DJANGO_SECRET_KEY also accepted for compatibility.
+      - OPENREPO_PG_PORT=5432
       - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
     depends_on:
       django:
@@ -69,6 +105,9 @@ services:
       timeout: 5s
       retries: 3
 
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — relational database
+  # ---------------------------------------------------------------------------
   db:
     image: postgres:16-alpine
     expose:
@@ -76,15 +115,21 @@ services:
     restart: unless-stopped
     environment:
       - POSTGRES_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
-      - POSTGRES_USER=postgres
-      - POSTGRES_DB=openrepo
+      - POSTGRES_USER=${OPENREPO_PG_USERNAME:-postgres}
+      - POSTGRES_DB=${OPENREPO_PG_DATABASE:-openrepo}
     volumes:
-      - openrepo-pq:/var/lib/postgresql/data
+      - openrepo-db:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "sh -c 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'" ]
+      test: ["CMD-SHELL", "sh -c 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}'"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+# =============================================================================
+# Persistent volumes
+# =============================================================================
 volumes:
+  # Package files, repo metadata (www/), GPG keyrings, caches
   openrepo-data:
-  openrepo-pq:
+  # PostgreSQL database files
+  openrepo-db:

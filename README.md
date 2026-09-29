@@ -49,8 +49,18 @@ The preferred method for running OpenRepo is with Docker using the provided `doc
 **Prerequisites:** [Docker](https://docs.docker.com/engine/install/) and the [Docker Compose plugin](https://docker-docs.netlify.app/compose/install/).
 
 ```bash
+# Download compose file and environment template
 wget https://raw.githubusercontent.com/opentreecz/openrepo/main/docker-compose.yml
+wget https://raw.githubusercontent.com/opentreecz/openrepo/main/.env.example
+
+# Configure (OPENREPO_SECRET_KEY is required)
+cp .env.example .env && $EDITOR .env
+
+# Start all services
 docker compose up -d
+
+# Create the initial admin user
+docker compose exec django ./django/manage.py createsuperuser
 ```
 
 Navigate to http://localhost:7376

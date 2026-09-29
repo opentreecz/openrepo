@@ -28,8 +28,21 @@ nav_order: 2
 ## Installation
 
 ```bash
+# Download the compose file and environment template
 wget https://raw.githubusercontent.com/opentreecz/openrepo/main/docker-compose.yml
+wget https://raw.githubusercontent.com/opentreecz/openrepo/main/.env.example
+
+# Configure environment (OPENREPO_SECRET_KEY is required)
+cp .env.example .env
+# Generate a secret key and paste it into .env:
+python3 -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'
+$EDITOR .env
+
+# Start all services
 docker compose up -d
+
+# Create the initial admin user
+docker compose exec django ./django/manage.py createsuperuser
 ```
 
 Navigate to **http://localhost:7376**
@@ -57,6 +70,7 @@ Copy `.env.example` to `.env` and configure before starting:
 | `OPENREPO_PG_HOSTNAME` | `db` | PostgreSQL host |
 | `OPENREPO_PG_DATABASE` | `openrepo` | PostgreSQL database name |
 | `OPENREPO_PG_USERNAME` | `postgres` | PostgreSQL username |
+| `OPENREPO_PORT` | `7376` | Host port for the web UI |
 | `OPENREPO_DB_TYPE` | `sqlite` | Database backend: `sqlite` or `postgresql` |
 | `OPENREPO_VAR_DIR` | `/var/lib/openrepo/` | Base directory for all persistent data |
 | `OPENREPO_DEBUG` | `FALSE` | Enable Django debug mode |
