@@ -51,7 +51,14 @@ class Repository(models.Model):
     def __str__(self):
         return self.repo_uid
 
-    repo_uid = models.CharField(db_index=True, unique=True, max_length=1024)
+    repo_uid = models.CharField(
+        db_index=True, unique=True, max_length=1024,
+        validators=[RegexValidator(
+            regex=r'^[a-zA-Z0-9][a-zA-Z0-9._-]*$',
+            message="repo_uid may only contain alphanumeric characters, dots, underscores, "
+                    "and hyphens, and must start with an alphanumeric character.",
+        )],
+    )
 
     write_access = models.ManyToManyField(User)
 

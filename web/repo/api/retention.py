@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime, timedelta, timezone
 
+from django.db import transaction
+
 from repo.models import Package, Repository
 
 logger = logging.getLogger("openrepo_web")
@@ -54,8 +56,9 @@ def apply_retention_policy(repo, package_name, architecture):
             f"Retention policy '{policy}' removing {len(safe_to_delete)} package(s) "
             f"from repo '{repo.repo_uid}': {uids}"
         )
-        for pkg in safe_to_delete:
-            pkg.delete()
+        with transaction.atomic():
+            for pkg in safe_to_delete:
+                pkg.delete()
 
 
 def apply_retention_policy_repo(repo):

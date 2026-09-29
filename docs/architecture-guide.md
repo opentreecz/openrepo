@@ -324,7 +324,7 @@ The following package formats are planned or under consideration for future Open
 
 | Format | Extension | Ecosystem | Status |
 |---|---|---|---|
-| **Alpine APK** | `.apk` | Alpine Linux, Docker base images | Planned |
+| **Alpine APK** | `.apk` | Alpine Linux, Docker base images | **Implemented** (v2.8.0) |
 | **Flatpak** | `.flatpak` | Desktop Linux (sandboxed) | Under consideration |
 | **AppImage** | `.AppImage` | Desktop Linux (portable) | Under consideration |
 | **Snap** | `.snap` | Ubuntu, IoT devices | Under consideration |

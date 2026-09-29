@@ -26,34 +26,39 @@ web/
     views.py             — Web views
     signals.py           — Package add/delete signals (mark repo stale)
     api/
-      views.py           — DRF viewsets (14 endpoint groups)
+      views.py           — DRF viewsets (15 endpoint groups, incl. HealthCheckView)
       urls.py            — API URL routing
       serializers.py     — 12 serializer classes
       upload_processor.py — Async upload handling (background thread)
       retention.py       — Package retention policy logic
       authentication.py  — Token auth + permissions
+      errors.py          — Structured error codes (ApiErrorCode, api_error)
+      exception_handler.py — Custom DRF exception handler
       middleware.py      — VersionHeaderMiddleware (X-OpenRepo-Version)
-      pagination.py      — PageNumberPagination (max 500)
+      pagination.py      — PageNumberPagination (page_size=100, max 500)
       filters.py         — Build/BuildLog filters
       util.py            — Custom hyperlinked fields, SHA-512
     worker/
       bgworker.py        — Background thread for repo rebuilds + retention
     storage/
       keyring.py         — GPG keyring management
+      encryption.py      — EncryptedCharField (Fernet at-rest encryption)
       filemanager.py     — File storage with deduplication
-    tests/               — 20 test files, 100+ test methods
+    tests/               — 24 test files, 140+ test methods
   adapters/
     registry.py          — Adapter registry (REPO_ADAPTERS, FILE_ADAPTERS dicts)
     repo/
       base_repo.py       — Base repo adapter (subprocess execution, shell=False)
       deb_repo.py        — Debian repo metadata generation
       rpm_repo.py        — RPM repo metadata generation
-      generic_repo.py    — Generic file repo (minimal)
+      apk_repo.py        — Alpine APK repo (APKINDEX.tar.gz generation)
+      generic_repo.py    — Generic file repo (HTML index, MD5, PGP signing)
       fallback_tools.py  — Pure-Python fallbacks (OpenWrt)
     file/
       base_adapter.py    — Abstract base file adapter (abc.ABC)
       deb_adapter.py     — .deb metadata parsing
       rpm_adapter.py     — .rpm metadata parsing
+      apk_adapter.py     — .apk metadata parsing (.PKGINFO)
       file_adapter.py    — Generic file handling
 frontend/
   src/                   — Vue.js 3 SPA
@@ -97,8 +102,10 @@ Auth: `Authorization: Token <key>` (DRF TokenAuthentication).
 3. **~~Hardcoded SECRET_KEY~~** — ✅ RESOLVED: Raises `ImproperlyConfigured` if
    `OPENREPO_SECRET_KEY` or `DJANGO_SECRET_KEY` env var is not set.
 
-4. **PGP keys in plaintext** — `models.py:33-35` stores private keys and passphrases
-   as plain `CharField` in the database. (Phase 4.4)
+4. **~~PGP keys in plaintext~~** — ✅ RESOLVED: `EncryptedCharField` in
+   `repo/storage/encryption.py` uses Fernet encryption derived from `SECRET_KEY`.
+   `private_key_pem` and `passphrase` fields are transparently encrypted at rest.
+   Data migration `0016_encrypt_pgp_keys` encrypts existing plaintext values.
 
 ### Security (Medium/Low — resolved)
 
@@ -122,9 +129,11 @@ Auth: `Authorization: Token <key>` (DRF TokenAuthentication).
 
 8. **~~No subprocess timeout~~** — ✅ RESOLVED: 600-second timeout on all subprocess calls.
 
-9. **Retention N+1 queries** — `retention.py:42-47` runs separate DB query per package.
+9. **~~Retention N+1 queries~~** — ✅ RESOLVED: `retention.py` uses batch query with
+   `__in` lookup instead of per-package `.exists()` calls.
 
-10. **`keep_latest_n_and_age`** — Name says AND but logic is OR (union semantics).
+10. **~~`keep_latest_n_and_age`~~** — ✅ RESOLVED: Display text corrected from "AND" to
+    "OR" to match the union semantics. Clarifying comments added.
 
 ### API Contract
 
@@ -139,14 +148,17 @@ Auth: `Authorization: Token <key>` (DRF TokenAuthentication).
     - `PGPKeysViewSet.create()`: `PGPKeyCreateRequestSerializer` for request, empty 201 response
     - `PGPKeysViewSet.download()`: binary response annotation
 
-14. **PAGE_SIZE=2000 > max_page_size=500** — Default page exceeds max.
+14. **~~PAGE_SIZE=2000 > max_page_size=500~~** — ✅ RESOLVED: `page_size = 100` set in
+    `OpenRepoPagination` and `REST_FRAMEWORK["PAGE_SIZE"]` reduced from 2000 to 100.
 
 ### Testing
 
 15. **No E2E tests** — No test exercises openrepo-sync against a running server.
 16. **No RPM upload integration test** — Only deb has full pipeline test.
-17. **No pagination test** — `?page=2` behavior untested.
-18. **No generic repo test** — `generic_repo.py` entirely untested.
+17. **~~No pagination test~~** — ✅ RESOLVED: `test_pagination_and_users.py` tests
+    `?page=2`, `?page_size=N`, max cap, and invalid page.
+18. **~~No generic repo test~~** — ✅ RESOLVED: `test_generic_repo.py` tests HTML index,
+    MD5 checksums, PGP signing, and empty repo handling.
 
 ## Build & Test Commands
 
