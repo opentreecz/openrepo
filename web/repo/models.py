@@ -19,6 +19,9 @@ from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from django.db import models
 
+from repo.storage.encryption import EncryptedCharField
+
+
 logger = logging.getLogger("openrepo_web")
 
 
@@ -31,9 +34,9 @@ class PGPSigningKey(models.Model):
     email = models.CharField(max_length=2048)
 
     fingerprint = models.CharField(db_index=True, unique=True, max_length=65535)
-    private_key_pem = models.CharField(max_length=65536)
+    private_key_pem = EncryptedCharField(max_length=65536)
     public_key_pem = models.CharField(max_length=65536)
-    passphrase = models.CharField(max_length=65536, blank=True, default="")
+    passphrase = EncryptedCharField(max_length=65536, blank=True, default="")
 
     creation_date = models.DateTimeField(auto_now_add=True, blank=True)
 
