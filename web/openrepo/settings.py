@@ -222,7 +222,7 @@ REST_FRAMEWORK = {
         "repo.api.authentication.CustomOpenRepoPermission"
     ],
     "DEFAULT_PAGINATION_CLASS": "repo.api.pagination.OpenRepoPagination",
-    "PAGE_SIZE": 2000,
+    "PAGE_SIZE": 100,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "repo.api.exception_handler.openrepo_exception_handler",
 }

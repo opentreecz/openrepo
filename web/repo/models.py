@@ -67,7 +67,8 @@ class Repository(models.Model):
         (RETENTION_NONE, "Keep everything"),
         (RETENTION_KEEP_LATEST_N, "Keep latest N versions"),
         (RETENTION_MAX_AGE_DAYS, "Delete packages older than N days"),
-        (RETENTION_KEEP_LATEST_N_AND_AGE, "Keep latest N versions AND delete older than N days"),
+        # Union semantics: delete if over count OR over age (whichever is stricter).
+        (RETENTION_KEEP_LATEST_N_AND_AGE, "Keep latest N versions OR delete older than N days"),
     ]
 
     # When a newer package of the same name is uploaded, delete the older versions

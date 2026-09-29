@@ -39,12 +39,14 @@ def apply_retention_policy(repo, package_name, architecture):
     to_delete = _packages_to_delete(repo, policy, candidates)
 
     # Q4 A: never delete a package whose package_uid is referenced by another repo.
-    safe_to_delete = [
-        pkg for pkg in to_delete
-        if not Package.objects.filter(package_uid=pkg.package_uid)
+    # Batch query to avoid N+1: find all package_uids that exist in other repos.
+    candidate_uids = [pkg.package_uid for pkg in to_delete]
+    shared_uids = set(
+        Package.objects.filter(package_uid__in=candidate_uids)
         .exclude(repo=repo)
-        .exists()
-    ]
+        .values_list("package_uid", flat=True)
+    )
+    safe_to_delete = [pkg for pkg in to_delete if pkg.package_uid not in shared_uids]
 
     if safe_to_delete:
         uids = [p.package_uid for p in safe_to_delete]
@@ -90,7 +92,7 @@ def _packages_to_delete(repo, policy, candidates):
         return _over_age(candidates, repo.retention_max_age_days)
 
     if policy == Repository.RETENTION_KEEP_LATEST_N_AND_AGE:
-        # Union: delete if over count OR over age.
+        # Union semantics: delete if over count OR over age (whichever is stricter).
         by_count = set(_over_count(candidates, repo.retention_keep_count))
         by_age = set(_over_age(candidates, repo.retention_max_age_days))
         return list(by_count | by_age)
