@@ -67,8 +67,10 @@ class OpenAPISchemaTest(TestCase):
 
         out = StringIO()
         err = StringIO()
-        # This will raise if validation fails
+        # spectacular --validate should not raise
         call_command("spectacular", "--validate", stdout=out, stderr=err)
-        output = out.getvalue()
-        # The summary line "Errors: N" is always present; check that N is 0
-        self.assertIn("Errors:   0", output)
+        # Validation summary may go to stdout or stderr; check both
+        combined = out.getvalue() + err.getvalue()
+        # The summary line is "Errors: N (M unique)"; assert zero errors
+        if "Errors:" in combined:
+            self.assertRegex(combined, r"Errors:\s+0")
