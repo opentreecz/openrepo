@@ -239,7 +239,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "OpenRepo API",
     "DESCRIPTION": "Package repository management API for Debian APT, RPM, and generic repositories.",
-    "VERSION": "2.5.0",
+    "VERSION": "2.8.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "TAGS": [
