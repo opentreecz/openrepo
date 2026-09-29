@@ -88,4 +88,3 @@ class CustomOpenRepoPermission(permissions.BasePermission):
 
         logger.debug(f"User {user.username} unauthorized for {repo.repo_uid}")
         return False
-

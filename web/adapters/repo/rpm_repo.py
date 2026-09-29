@@ -184,4 +184,3 @@ class RpmRepoAdapter(BaseRepoAdapter):
             self._save_public_key(repo_path)
 
         return self._execute_commands(exec_commands, repo_path)
-

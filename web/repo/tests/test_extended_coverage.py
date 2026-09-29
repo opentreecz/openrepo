@@ -36,13 +36,14 @@ class PGPKeyCreateAPITestCase(APITestCase):
         """Creating a key with empty name returns 400"""
         response = self._post_key("", "test@example.com")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("name", response.data)
+        # Structured error envelope: {"code": ..., "detail": "name: ...", "status": 400}
+        self.assertIn("name", response.data.get("detail", response.data))
 
     def test_create_key_with_invalid_email_fails(self):
         """Creating a key with an invalid email returns 400"""
         response = self._post_key("Valid Name", "not-an-email")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("email", response.data)
+        self.assertIn("email", response.data.get("detail", response.data))
 
     @patch("repo.api.views.PGPKeyring")
     def test_create_key_with_valid_params_calls_keyring(self, mock_keyring_cls):

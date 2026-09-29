@@ -102,7 +102,7 @@ class CopyViewSetTestCase(APITestCase):
             {"dest_repo_uid": self.repo_deb2.repo_uid},
             HTTP_AUTHORIZATION=f"Token {self.admin_token}",
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
 
     def test_copy_from_nonexistent_source_repo_fails(self):
         """Copying from a non-existent source repo returns 404"""
@@ -142,7 +142,7 @@ class CopyViewSetTestCase(APITestCase):
             {"dest_repo_uid": self.repo_deb2.repo_uid},
             HTTP_AUTHORIZATION=f"Token {self.admin_token}",
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertIn("identical package already exists", response.data["detail"])
 
     def test_copy_same_name_version_different_architecture_succeeds(self):
@@ -441,7 +441,8 @@ class OverwriteUploadTestCase(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("package_file", response.data)
+        # Structured error envelope wraps field errors into "detail" string
+        self.assertIn("package_file", response.data.get("detail", response.data))
 
 
 class PGPKeyApiTestCase(APITestCase):
@@ -477,5 +478,5 @@ class PGPKeyApiTestCase(APITestCase):
             f"/api/signingkeys/{self.signing_key.fingerprint}/",
             HTTP_AUTHORIZATION=f"Token {self.admin_token}",
         )
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertIn("Unable to delete", response.data["detail"])

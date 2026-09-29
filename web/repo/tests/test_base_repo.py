@@ -457,7 +457,7 @@ class GenericRepoAdapterTestCase(TestCase):
         """GenericRepoAdapter._generate_repo_structure returns True"""
         adapter = GenericRepoAdapter(self.repo)
         adapter.build = Build.objects.create(repo=self.repo, build_number=1)
-        adapter.packages = []
+        adapter.packages = Package.objects.none()
 
         repo_path = os.path.join(settings.REPO_WWW_PATH, "gen_test_dir")
         os.makedirs(repo_path)

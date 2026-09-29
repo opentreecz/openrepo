@@ -59,7 +59,8 @@ class NegativeApiTestCase(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("repo_uid", response.data)
+        # Structured error envelope wraps field errors into "detail" string
+        self.assertIn("repo_uid", response.data.get("detail", response.data))
 
     def test_upload_to_nonexistent_repo(self):
         """Test uploading to a repo that doesn't exist returns 404"""

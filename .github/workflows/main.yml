@@ -16,6 +16,7 @@ jobs:
     env:
       OPENREPO_VAR_DIR: /tmp/openrepo/
       OPENREPO_SECRET_KEY: test-secret-key-for-ci-only
+      OPENREPO_DISABLE_THROTTLE: "1"
 
     steps:
       - uses: actions/checkout@v7

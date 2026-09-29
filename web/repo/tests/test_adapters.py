@@ -92,10 +92,14 @@ class AdapterTestCase(TestCase):
         self.assertTrue(success)
 
         # Check if key commands were called (apt-ftparchive, gpg)
+        # Commands are now passed as lists (shell=False), so args[0] is a list of strings
         called_commands = [call.args[0] for call in mock_run.call_args_list]
-        self.assertTrue(any("apt-ftparchive" in cmd for cmd in called_commands))
-        self.assertTrue(any("gpg" in cmd for cmd in called_commands))
-        self.assertTrue(any("--local-user 8EC5273D32F78A238F54CBEB66633B39A053B24A" in cmd for cmd in called_commands))
+        self.assertTrue(any("apt-ftparchive" in cmd for cmd in called_commands if isinstance(cmd, list)))
+        self.assertTrue(any("gpg" in cmd for cmd in called_commands if isinstance(cmd, list)))
+        self.assertTrue(any(
+            "--local-user" in cmd and "8EC5273D32F78A238F54CBEB66633B39A053B24A" in cmd
+            for cmd in called_commands if isinstance(cmd, list)
+        ))
 
     def test_repo_instructions(self):
         """Test that repo instructions are correctly generated"""
@@ -151,7 +155,7 @@ class AdapterTestCase(TestCase):
 
         self.assertTrue(success)
         called_commands = [call.args[0] for call in mock_run.call_args_list]
-        self.assertTrue(any("createrepo" in cmd for cmd in called_commands))
+        self.assertTrue(any("createrepo" in cmd for cmd in called_commands if isinstance(cmd, list)))
         self.assertTrue(
-            any("gpg" in cmd for cmd in called_commands) and any("--detach-sign" in cmd for cmd in called_commands)
+            any("gpg" in cmd and "--detach-sign" in cmd for cmd in called_commands if isinstance(cmd, list))
         )

@@ -102,7 +102,7 @@ class UserViewSetTestCase(APITestCase):
 
     def setUp(self):
         self.admin = User.objects.create_superuser(
-            username="admin", email="admin@test.com", password="adminpass"
+            username="user_crud_admin", email="user_crud_admin@test.com", password="adminpass"
         )
         token = Token.objects.get(user=self.admin)
         self.http_auth = f"Token {token.key}"

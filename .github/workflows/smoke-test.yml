@@ -11,6 +11,8 @@ jobs:
     name: Docker Compose Smoke Test
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    env:
+      OPENREPO_SECRET_KEY: smoke-test-ci-secret-key-do-not-use-in-production
     steps:
       - uses: actions/checkout@v7
 
@@ -64,7 +66,8 @@ jobs:
       - name: Test authentication enforcement
         run: |
           # Attempt to create a repo without auth (should fail with 401/403)
-          response=$(curl -sf -o /dev/null -w "%{http_code}" -X POST \
+          # Note: do NOT use curl -f here — we expect a non-2xx response
+          response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
             -H "Content-Type: application/json" \
             -d '{"repo_uid":"test","repo_type":"deb","signing_key":""}' \
             http://localhost:7376/api/repos/)
@@ -72,19 +75,29 @@ jobs:
             echo "::error::API should require authentication for repo creation"
             exit 1
           fi
+          if [ "$response" != "401" ] && [ "$response" != "403" ]; then
+            echo "::warning::Expected HTTP 401 or 403, got HTTP $response"
+          fi
           echo "Authentication enforced (HTTP $response)"
 
       - name: Get admin API token
         id: auth
         run: |
           # Get admin token via Django management command
-          TOKEN=$(docker compose exec -T django python manage.py shell -c "
+          # The app lives at /app/django inside the container
+          TOKEN=$(docker compose exec -T -w /app/django django python manage.py shell -c "
           from rest_framework.authtoken.models import Token
           from django.contrib.auth.models import User
           user = User.objects.get(username='admin')
           token, _ = Token.objects.get_or_create(user=user)
           print(token.key)
           " 2>/dev/null | tail -1)
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Failed to obtain admin API token"
+            docker compose logs django
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
           echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
           echo "Got admin API token"
 

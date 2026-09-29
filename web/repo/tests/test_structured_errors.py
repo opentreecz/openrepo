@@ -33,7 +33,7 @@ from rest_framework.test import APITestCase, APIClient
 from django.test import TestCase
 
 from repo.api.errors import ApiErrorCode
-from repo.api.exception_handler import _flatten_detail, openrepo_exception_handler
+from repo.api.exception_handler import _flatten_detail
 from repo.api.upload_processor import process_upload
 from repo.models import Package, PGPSigningKey, Repository, UploadTask
 

@@ -196,6 +196,8 @@ class PackagesViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         repo_uid = self.kwargs["repo_uid"]
+        if not Repository.objects.filter(repo_uid=repo_uid).exists():
+            raise rest_framework.exceptions.NotFound(f"Repo {repo_uid} not found")
         queryset = Package.objects.filter(repo__repo_uid=repo_uid).select_related("repo")
         # Optional architecture filter
         architecture = self.request.query_params.get("architecture")
@@ -275,8 +277,8 @@ class CopyViewSet(viewsets.ViewSet):
         except Package.DoesNotExist:
             raise rest_framework.exceptions.NotFound(f"Package {package_uid} not found in repo {repo_uid}")
 
-        dst_repo_uid = request.POST.get("dest_repo_uid")
-        logger.debug(request.POST)
+        dst_repo_uid = request.data.get("dest_repo_uid")
+        logger.debug(request.data)
         logger.debug(f"Copying {repo_uid} / {package_uid} to {dst_repo_uid}")
 
         try:
