@@ -123,6 +123,7 @@
             option_repo_types: [
                 { text: 'Debian/APT', value: 'deb' },
                 { text: 'Red Hat/RPM', value: 'rpm' },
+                { text: 'Alpine/APK', value: 'apk' },
                 { text: 'Generic Files', value: 'files' },
             ],
             //submitted: false

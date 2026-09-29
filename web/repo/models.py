@@ -40,7 +40,7 @@ class PGPSigningKey(models.Model):
 
 class Repository(models.Model):
 
-    REPO_TYPES = [("deb", "Debian/APT"), ("rpm", "Red Hat/RPM"), ("files", "Generic Files")]
+    REPO_TYPES = [("deb", "Debian/APT"), ("rpm", "Red Hat/RPM"), ("apk", "Alpine/APK"), ("files", "Generic Files")]
 
     class Meta:
         verbose_name_plural = "repositories"

@@ -173,6 +173,7 @@
                 FILE_TYPES: {
                     'deb': '.deb,.ddeb',
                     'rpm': '.rpm',
+                    'apk': '.apk',
                     'generic': '*'
                 },
             };

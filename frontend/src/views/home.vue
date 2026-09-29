@@ -111,6 +111,7 @@
         repo_type_icons: {
             deb: "mdi-ubuntu",
             rpm: "mdi-redhat",
+            apk: "mdi-package-variant",
             files: "mdi-file-multiple-outline"
             },
         depthColors: ['primary', 'secondary', 'accent', 'warning'],
