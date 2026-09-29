@@ -108,7 +108,7 @@ class RepoDetailSerializer(serializers.HyperlinkedModelSerializer):
             "write_access",
         ]
 
-    def get_repo_instructions(self, obj):
+    def get_repo_instructions(self, obj) -> str:
         repo_adapter = get_repo_adapter(obj)
         return repo_adapter._get_repo_instructions()
 
