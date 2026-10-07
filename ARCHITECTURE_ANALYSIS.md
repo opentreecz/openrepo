@@ -83,9 +83,9 @@
 | 8 | ~~Upload status lacks per-user authz~~ | Low | ✅ RESOLVED — checks superuser or write access |
 | 9 | Weak password validation (min 6, no common check) | Low | `settings.py:155-171` |
 | 10 | `repo_uid` validation only at serializer level | Low | `base_repo.py:220` |
-| 11 | No filename/metadata sanitization on upload | Low | `views.py:327`, `base_repo.py:89` |
-| 12 | Prefix-match directory cleanup | Low | `base_repo.py:150-158` |
-| 13 | `tarfile.open()` on untrusted .deb | Low | `fallback_tools.py:83` |
+| 11 | ~~No filename/metadata sanitization on upload~~ | Low | ✅ RESOLVED — `os.path.basename()` + control char rejection |
+| 12 | ~~Prefix-match directory cleanup~~ | Low | ✅ RESOLVED — validates numeric suffix in `_clean_old_dirs()` |
+| 13 | ~~`tarfile.open()` on untrusted .deb~~ | Low | ✅ RESOLVED — `extraction_filter = data_filter` (Python 3.12+) |
 
 ## Adapter Pattern Issues
 

@@ -160,9 +160,11 @@ class BaseRepoAdapter:
         prefix = f"{self.repo_uid}."
         for d in alldirs:
             if d.startswith(prefix) and d != cur_repo_dir:
-                fullpath = os.path.join(settings.REPO_WWW_PATH, d)
-                logger.debug(f"Removing old repo dir {fullpath}")
-                shutil.rmtree(fullpath)
+                suffix = d[len(prefix):]
+                if suffix.isdigit():
+                    fullpath = os.path.join(settings.REPO_WWW_PATH, d)
+                    logger.debug(f"Removing old repo dir {fullpath}")
+                    shutil.rmtree(fullpath)
 
     def _save_public_key(self, repo_path):
 

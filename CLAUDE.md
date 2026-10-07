@@ -115,6 +115,12 @@ Auth: `Authorization: Token <key>` (DRF TokenAuthentication).
   configurable via `OPENREPO_MAX_UPLOAD_SIZE` env var.
 - **~~Upload status lacks per-user authz~~** — ✅ RESOLVED: `UploadStatusView` checks
   superuser or write access to the task's repo.
+- **~~No filename sanitization on upload~~** — ✅ RESOLVED: `os.path.basename()` strips
+  path traversal from uploaded filenames; control characters rejected. (`views.py`)
+- **~~Prefix-match directory cleanup~~** — ✅ RESOLVED: `_clean_old_dirs()` now validates
+  the suffix after the dot is purely numeric, preventing deletion of unrelated directories. (`base_repo.py`)
+- **~~tarfile on untrusted .deb~~** — ✅ RESOLVED: `fallback_tools.py` sets
+  `tar.extraction_filter = tarfile.data_filter` on Python 3.12+ (defense-in-depth). (`fallback_tools.py`)
 
 ### Architecture
 

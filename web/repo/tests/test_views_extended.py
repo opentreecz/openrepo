@@ -7,11 +7,12 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from repo.models import Package, PGPSigningKey, Repository
+from repo.models import Package, PGPSigningKey, Repository, UploadTask
 
 
 class CopyViewSetTestCase(APITestCase):
@@ -354,6 +355,77 @@ class BuildApiTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data["results"]), 1)
         self.assertEqual(response.data["results"][0]["command"], "createrepo")
+
+
+class FilenameSanitizationTestCase(APITestCase):
+    """Test that uploaded filenames are sanitized against path traversal and control characters."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="san_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+
+        self.test_dir = tempfile.mkdtemp()
+        settings.STORAGE_PATH = self.test_dir
+
+        self.signing_key = PGPSigningKey.objects.create(
+            name="SanKey",
+            email="san@example.com",
+            fingerprint="SAN_FP_12345678",
+            public_key_pem="pub",
+            private_key_pem="priv",
+        )
+        self.repo = Repository.objects.create(
+            repo_uid="san-repo", repo_type="files", signing_key=self.signing_key
+        )
+
+    def _upload(self, filename, content=b"dummy package content"):
+        upload_file = SimpleUploadedFile(filename, content, content_type="application/octet-stream")
+        return self.client.post(
+            f"/api/{self.repo.repo_uid}/upload/",
+            data={"package_file": upload_file},
+            format="multipart",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+
+    @patch.object(threading.Thread, "start", lambda self: None)
+    def test_path_traversal_filename_is_stripped(self):
+        """Filenames with path traversal sequences are reduced to the basename."""
+        response = self._upload("../../etc/evil.deb")
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        task = UploadTask.objects.get(pk=response.data["task_id"])
+        self.assertEqual(task.filename, "evil.deb")
+
+    @patch.object(threading.Thread, "start", lambda self: None)
+    def test_absolute_path_filename_is_stripped(self):
+        """Absolute path filenames are reduced to the basename."""
+        response = self._upload("/tmp/secret/payload.rpm")
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        task = UploadTask.objects.get(pk=response.data["task_id"])
+        self.assertEqual(task.filename, "payload.rpm")
+
+    @patch.object(threading.Thread, "start", lambda self: None)
+    def test_normal_filename_unchanged(self):
+        """A plain filename without path components is stored as-is."""
+        response = self._upload("my-package-1.0.deb")
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        task = UploadTask.objects.get(pk=response.data["task_id"])
+        self.assertEqual(task.filename, "my-package-1.0.deb")
+
+    def test_null_byte_in_filename_sanitized_by_django(self):
+        """Django's multipart parser strips null bytes — the resulting filename is still valid."""
+        response = self._upload("evil\x00.deb")
+        # Django strips null bytes before our code runs, so the upload succeeds
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        task = UploadTask.objects.get(pk=response.data["task_id"])
+        self.assertNotIn("\x00", task.filename)
+
+    def test_control_char_in_filename_sanitized_by_django(self):
+        """Django's multipart parser strips control characters — filename still valid."""
+        response = self._upload("evil\x0a.deb")
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        task = UploadTask.objects.get(pk=response.data["task_id"])
+        self.assertNotIn("\x0a", task.filename)
 
 
 class OverwriteUploadTestCase(APITestCase):

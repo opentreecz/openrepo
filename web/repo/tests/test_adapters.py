@@ -1,6 +1,9 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
+import gzip
+import io
 import os
 import shutil
+import tarfile
 import tempfile
 from unittest.mock import MagicMock, patch
 
@@ -10,8 +13,40 @@ from django.test import TestCase
 from adapters.file.deb_adapter import DebFileAdapter
 from adapters.file.rpm_adapter import RpmFileAdapter
 from adapters.repo.deb_repo import DebRepoAdapter
+from adapters.repo.fallback_tools import _read_deb_control
 from adapters.repo.rpm_repo import RpmRepoAdapter
 from repo.models import Build, Package, PGPSigningKey, Repository
+
+
+def _make_test_deb(path):
+    """Create a minimal .deb with control.tar.gz for testing _read_deb_control."""
+    ctrl = b"Package: test-pkg\nVersion: 1.0\nArchitecture: all\nDescription: test\n"
+
+    tar_buf = io.BytesIO()
+    tar = tarfile.open(fileobj=tar_buf, mode="w")
+    info = tarfile.TarInfo(name="./control")
+    info.size = len(ctrl)
+    tar.addfile(info, io.BytesIO(ctrl))
+    tar.close()
+    gz_bytes = gzip.compress(tar_buf.getvalue())
+
+    with open(path, "wb") as f:
+        f.write(b"!<arch>\n")
+        # debian-binary member
+        content = b"2.0\n"
+        f.write(b"debian-binary   0           0     0     100644  ")
+        f.write(str(len(content)).encode().ljust(10))
+        f.write(b"\x60\n")
+        f.write(content)
+        if len(content) % 2:
+            f.write(b"\n")
+        # control.tar.gz member
+        f.write(b"control.tar.gz  0           0     0     100644  ")
+        f.write(str(len(gz_bytes)).encode().ljust(10))
+        f.write(b"\x60\n")
+        f.write(gz_bytes)
+        if len(gz_bytes) % 2:
+            f.write(b"\n")
 
 
 class AdapterTestCase(TestCase):
@@ -159,3 +194,54 @@ class AdapterTestCase(TestCase):
         self.assertTrue(
             any("gpg" in cmd and "--detach-sign" in cmd for cmd in called_commands if isinstance(cmd, list))
         )
+
+
+class FallbackToolsTarfileFilterTestCase(TestCase):
+    """Test that _read_deb_control sets tarfile.extraction_filter when available."""
+
+    def setUp(self):
+        self.test_dir = tempfile.mkdtemp()
+        self.deb_path = os.path.join(self.test_dir, "test.deb")
+        _make_test_deb(self.deb_path)
+
+    def tearDown(self):
+        shutil.rmtree(self.test_dir)
+
+    def test_read_deb_control_returns_valid_control(self):
+        """_read_deb_control successfully reads control data from a .deb"""
+        control = _read_deb_control(self.deb_path)
+        self.assertIn("Package:", control)
+        self.assertIn("test-pkg", control)
+
+    def test_read_deb_control_sets_extraction_filter_when_available(self):
+        """When tarfile.data_filter exists (Python 3.12+), extraction_filter is set."""
+        sentinel = lambda member, path: member  # noqa: E731
+        with patch.object(tarfile, "data_filter", sentinel, create=True):
+            original_open = tarfile.open
+            captured_tar = []
+
+            def capturing_open(*args, **kwargs):
+                tar = original_open(*args, **kwargs)
+                captured_tar.append(tar)
+                return tar
+
+            with patch("tarfile.open", side_effect=capturing_open):
+                _read_deb_control(self.deb_path)
+
+            self.assertTrue(len(captured_tar) > 0)
+            self.assertIs(captured_tar[0].extraction_filter, sentinel)
+
+    def test_read_deb_control_works_without_data_filter(self):
+        """On Python < 3.12 (no tarfile.data_filter), the function still works."""
+        had_attr = hasattr(tarfile, "data_filter")
+        if had_attr:
+            saved = tarfile.data_filter
+            delattr(tarfile, "data_filter")
+        try:
+            control = _read_deb_control(self.deb_path)
+        finally:
+            if had_attr:
+                tarfile.data_filter = saved
+
+        self.assertIn("Package:", control)
+        self.assertIn("test-pkg", control)

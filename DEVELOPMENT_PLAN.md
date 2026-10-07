@@ -211,9 +211,9 @@ achieve RCE.
 - PGP keys generated without passphrase (`keyring.py:52`)
 - Weak password validation (min 6 chars, `CommonPasswordValidator` commented out)
 - `repo_uid` validation only at serializer level, not model level
-- No filename/metadata sanitization on upload
-- Prefix-match directory cleanup could affect similarly-named repos
-- `tarfile.open()` on untrusted .deb in fallback tools
+- ~~No filename/metadata sanitization on upload~~ — ✅ RESOLVED: `os.path.basename()` + control char rejection in `views.py`
+- ~~Prefix-match directory cleanup could affect similarly-named repos~~ — ✅ RESOLVED: `_clean_old_dirs()` validates numeric suffix in `base_repo.py`
+- ~~`tarfile.open()` on untrusted .deb in fallback tools~~ — ✅ RESOLVED: `extraction_filter = tarfile.data_filter` (Python 3.12+) in `fallback_tools.py`
 
 ---
 

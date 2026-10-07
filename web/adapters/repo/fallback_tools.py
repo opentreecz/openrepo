@@ -81,6 +81,8 @@ def _read_deb_control(filepath):
 
                 # Parse as tar
                 tar = tarfile.open(fileobj=io.BytesIO(control_data))
+                if hasattr(tarfile, 'data_filter'):  # Python 3.12+
+                    tar.extraction_filter = tarfile.data_filter
                 for member in tar.getmembers():
                     if member.name in ("./control", "control"):
                         ctrl_file = tar.extractfile(member)
