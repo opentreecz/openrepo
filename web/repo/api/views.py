@@ -15,6 +15,7 @@
 import hashlib
 import logging
 import os
+import re
 import threading
 
 import rest_framework.exceptions
@@ -365,7 +366,11 @@ class UploadViewSet(viewsets.ViewSet):
         overwrite_str = request.POST.get("overwrite", "0").lower()
         overwrite = overwrite_str in ("true", "1", "yes")
         filesize = file_uploaded.size
-        filename = file_uploaded.name
+        filename = os.path.basename(file_uploaded.name)
+        if not filename or re.search(r'[\x00-\x1f]', filename):
+            raise rest_framework.exceptions.ValidationError(
+                {"package_file": "Invalid filename."}
+            )
 
         file_manager = RepoFileManager()
         stored_filename = file_manager.get_filepath()

@@ -107,6 +107,31 @@ class BaseRepoAdapterBuildLogTestCase(TestCase):
         self.assertTrue(os.path.exists(os.path.join(settings.REPO_WWW_PATH, keep_dir)))
         self.assertTrue(os.path.exists(os.path.join(settings.REPO_WWW_PATH, other_dir)))
 
+    def test_clean_old_dirs_skips_non_numeric_suffix(self):
+        """_clean_old_dirs preserves directories whose suffix after the dot is not purely numeric"""
+        adapter = self._make_adapter()
+        adapter.repo_uid = "cleantest"
+
+        keep_dir = "cleantest.000000002"
+        old_dir = "cleantest.000000001"
+        backup_dir = "cleantest.backup"
+        notes_dir = "cleantest.old"
+        similar_repo = "cleantest.abc123"
+
+        for d in [keep_dir, old_dir, backup_dir, notes_dir, similar_repo]:
+            os.makedirs(os.path.join(settings.REPO_WWW_PATH, d))
+
+        adapter._clean_old_dirs(keep_dir)
+
+        # Old versioned directory should be removed
+        self.assertFalse(os.path.exists(os.path.join(settings.REPO_WWW_PATH, old_dir)))
+        # Current directory should be preserved
+        self.assertTrue(os.path.exists(os.path.join(settings.REPO_WWW_PATH, keep_dir)))
+        # Non-numeric suffixes should all be preserved
+        self.assertTrue(os.path.exists(os.path.join(settings.REPO_WWW_PATH, backup_dir)))
+        self.assertTrue(os.path.exists(os.path.join(settings.REPO_WWW_PATH, notes_dir)))
+        self.assertTrue(os.path.exists(os.path.join(settings.REPO_WWW_PATH, similar_repo)))
+
     def test_save_public_key_writes_file(self):
         """_save_public_key writes the public key PEM to public.gpg in repo dir"""
         adapter = self._make_adapter()
