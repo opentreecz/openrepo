@@ -1,0 +1,2720 @@
+openapi: 3.0.3
+info:
+  title: OpenRepo API
+  version: 2.8.0
+  description: Package repository management API for Debian APT, RPM, and generic
+    repositories.
+paths:
+  /api/{repo_uid}/:
+    get:
+      operationId: root_retrieve
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoDetail'
+          description: ''
+    put:
+      operationId: root_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoDetail'
+          description: ''
+    delete:
+      operationId: root_destroy
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/{repo_uid}/packages/:
+    get:
+      operationId: packages_list
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - packages
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPackageSummaryList'
+          description: ''
+  /api/{repo_uid}/pkg/{package_uid}/:
+    get:
+      operationId: pkg_retrieve
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: package_uid
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - pkg
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageDetail'
+          description: ''
+    put:
+      operationId: pkg_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: package_uid
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - pkg
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PackageDetailRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PackageDetailRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PackageDetailRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageDetail'
+          description: ''
+    delete:
+      operationId: pkg_destroy
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: package_uid
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - pkg
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/{repo_uid}/pkg/{package_uid}/copy/:
+    post:
+      operationId: pkg_copy_create
+      description: Copy a package to another repository.
+      parameters:
+      - in: path
+        name: package_uid
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - pkg
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CopyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CopyRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageDetail'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/{repo_uid}/upload/:
+    post:
+      operationId: upload_create
+      description: Upload a package file. Returns a task ID for async status polling.
+        Returns 409 if the package already exists and overwrite is not set.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - upload
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/buildlogs/:
+    get:
+      operationId: buildlogs_list
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: query
+        name: build
+        schema:
+          type: integer
+      - in: query
+        name: loglevel
+        schema:
+          type: string
+      - in: query
+        name: max_line
+        schema:
+          type: integer
+      - in: query
+        name: max_time
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: min_line
+        schema:
+          type: integer
+      - in: query
+        name: min_time
+        schema:
+          type: string
+          format: date-time
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: repo
+        schema:
+          type: string
+      tags:
+      - buildlogs
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBuildLogList'
+          description: ''
+  /api/builds/:
+    get:
+      operationId: builds_list
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: query
+        name: build_number
+        schema:
+          type: integer
+      - in: query
+        name: completion_status
+        schema:
+          type: string
+          enum:
+          - complete_fail
+          - complete_success
+          - running
+        description: |-
+          * `running` - Running
+          * `complete_success` - Completed Successfully
+          * `complete_fail` - Failed
+      - in: query
+        name: max_build
+        schema:
+          type: integer
+      - in: query
+        name: max_time
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: min_build
+        schema:
+          type: integer
+      - in: query
+        name: min_time
+        schema:
+          type: string
+          format: date-time
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: repo
+        schema:
+          type: string
+      tags:
+      - builds
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBuildList'
+          description: ''
+  /api/health/:
+    get:
+      operationId: health_retrieve
+      description: |-
+        Unauthenticated health check endpoint.
+
+        Returns database connectivity status and the application version.
+        Intended for monitoring systems and load balancer probes.
+      tags:
+      - health
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  database:
+                    type: string
+                    example: ok
+                  version:
+                    type: string
+                    example: 2.5.0
+                  repos:
+                    type: integer
+                    example: 5
+                  packages:
+                    type: integer
+                    example: 142
+          description: ''
+  /api/repos/:
+    get:
+      operationId: repos_list
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - repos
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRepoSummaryList'
+          description: ''
+    post:
+      operationId: repos_create
+      description: API endpoint that allows groups to be viewed or edited.
+      tags:
+      - repos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoDetail'
+          description: ''
+  /api/repos/{repo_uid}/:
+    get:
+      operationId: repos_retrieve
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - repos
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoSummary'
+          description: ''
+    put:
+      operationId: repos_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - repos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepoSummaryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepoSummaryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepoSummaryRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoSummary'
+          description: ''
+    patch:
+      operationId: repos_partial_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - repos
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRepoSummaryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRepoSummaryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRepoSummaryRequest'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoSummary'
+          description: ''
+    delete:
+      operationId: repos_destroy
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - repos
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/signingkeys/:
+    get:
+      operationId: signingkeys_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - signingkeys
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPGPKeyList'
+          description: ''
+    post:
+      operationId: signingkeys_create
+      description: Generate a new PGP signing key pair.
+      tags:
+      - signingkeys
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PGPKeyCreateRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PGPKeyCreateRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PGPKeyCreateRequestRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          description: No response body
+  /api/signingkeys/{fingerprint}/:
+    get:
+      operationId: signingkeys_retrieve
+      parameters:
+      - in: path
+        name: fingerprint
+        schema:
+          type: string
+        required: true
+      tags:
+      - signingkeys
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PGPKey'
+          description: ''
+    put:
+      operationId: signingkeys_update
+      parameters:
+      - in: path
+        name: fingerprint
+        schema:
+          type: string
+        required: true
+      tags:
+      - signingkeys
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PGPKeyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PGPKeyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PGPKeyRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PGPKey'
+          description: ''
+    patch:
+      operationId: signingkeys_partial_update
+      parameters:
+      - in: path
+        name: fingerprint
+        schema:
+          type: string
+        required: true
+      tags:
+      - signingkeys
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPGPKeyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPGPKeyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPGPKeyRequest'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PGPKey'
+          description: ''
+    delete:
+      operationId: signingkeys_destroy
+      parameters:
+      - in: path
+        name: fingerprint
+        schema:
+          type: string
+        required: true
+      tags:
+      - signingkeys
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/signingkeys/{fingerprint}/download/:
+    get:
+      operationId: signingkeys_download_retrieve
+      description: Download the public PGP key in ASCII-armored format.
+      parameters:
+      - in: path
+        name: fingerprint
+        schema:
+          type: string
+        required: true
+      tags:
+      - signingkeys
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/pgp-keys:
+              schema:
+                type: string
+                format: binary
+          description: ''
+  /api/upload-status/{task_id}/:
+    get:
+      operationId: upload_status_retrieve
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - upload-status
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadTask'
+          description: ''
+  /api/users/:
+    get:
+      operationId: users_list
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - users
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+          description: ''
+    post:
+      operationId: users_create
+      description: API endpoint that allows users to be viewed or edited.
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/users/{id}/:
+    get:
+      operationId: users_retrieve
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: users_update
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: users_partial_update
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    delete:
+      operationId: users_destroy
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - users
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/{repo_uid}/:
+    get:
+      operationId: v1_retrieve
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoDetail'
+          description: ''
+    put:
+      operationId: v1_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoDetail'
+          description: ''
+    delete:
+      operationId: v1_destroy
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/{repo_uid}/packages/:
+    get:
+      operationId: v1_packages_list
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Which field to use when ordering the results.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      - name: search
+        required: false
+        in: query
+        description: A search term.
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPackageSummaryList'
+          description: ''
+  /api/v1/{repo_uid}/pkg/{package_uid}/:
+    get:
+      operationId: v1_pkg_retrieve
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: package_uid
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageDetail'
+          description: ''
+    put:
+      operationId: v1_pkg_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: package_uid
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PackageDetailRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PackageDetailRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PackageDetailRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageDetail'
+          description: ''
+    delete:
+      operationId: v1_pkg_destroy
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: package_uid
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/{repo_uid}/pkg/{package_uid}/copy/:
+    post:
+      operationId: v1_pkg_copy_create
+      description: Copy a package to another repository.
+      parameters:
+      - in: path
+        name: package_uid
+        schema:
+          type: string
+        required: true
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CopyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CopyRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PackageDetail'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/{repo_uid}/upload/:
+    post:
+      operationId: v1_upload_create
+      description: Upload a package file. Returns a task ID for async status polling.
+        Returns 409 if the package already exists and overwrite is not set.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UploadRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+  /api/v1/buildlogs/:
+    get:
+      operationId: v1_buildlogs_list
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: query
+        name: build
+        schema:
+          type: integer
+      - in: query
+        name: loglevel
+        schema:
+          type: string
+      - in: query
+        name: max_line
+        schema:
+          type: integer
+      - in: query
+        name: max_time
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: min_line
+        schema:
+          type: integer
+      - in: query
+        name: min_time
+        schema:
+          type: string
+          format: date-time
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: repo
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBuildLogList'
+          description: ''
+  /api/v1/builds/:
+    get:
+      operationId: v1_builds_list
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: query
+        name: build_number
+        schema:
+          type: integer
+      - in: query
+        name: completion_status
+        schema:
+          type: string
+          enum:
+          - complete_fail
+          - complete_success
+          - running
+        description: |-
+          * `running` - Running
+          * `complete_success` - Completed Successfully
+          * `complete_fail` - Failed
+      - in: query
+        name: max_build
+        schema:
+          type: integer
+      - in: query
+        name: max_time
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: min_build
+        schema:
+          type: integer
+      - in: query
+        name: min_time
+        schema:
+          type: string
+          format: date-time
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: repo
+        schema:
+          type: string
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBuildList'
+          description: ''
+  /api/v1/health/:
+    get:
+      operationId: v1_health_retrieve
+      description: |-
+        Unauthenticated health check endpoint.
+
+        Returns database connectivity status and the application version.
+        Intended for monitoring systems and load balancer probes.
+      tags:
+      - v1
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  database:
+                    type: string
+                    example: ok
+                  version:
+                    type: string
+                    example: 2.5.0
+                  repos:
+                    type: integer
+                    example: 5
+                  packages:
+                    type: integer
+                    example: 142
+          description: ''
+  /api/v1/repos/:
+    get:
+      operationId: v1_repos_list
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRepoSummaryList'
+          description: ''
+    post:
+      operationId: v1_repos_create
+      description: API endpoint that allows groups to be viewed or edited.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepoDetailRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoDetail'
+          description: ''
+  /api/v1/repos/{repo_uid}/:
+    get:
+      operationId: v1_repos_retrieve
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoSummary'
+          description: ''
+    put:
+      operationId: v1_repos_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RepoSummaryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RepoSummaryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RepoSummaryRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoSummary'
+          description: ''
+    patch:
+      operationId: v1_repos_partial_update
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRepoSummaryRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRepoSummaryRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRepoSummaryRequest'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RepoSummary'
+          description: ''
+    delete:
+      operationId: v1_repos_destroy
+      description: API endpoint that allows groups to be viewed or edited.
+      parameters:
+      - in: path
+        name: repo_uid
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/signingkeys/:
+    get:
+      operationId: v1_signingkeys_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPGPKeyList'
+          description: ''
+    post:
+      operationId: v1_signingkeys_create
+      description: Generate a new PGP signing key pair.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PGPKeyCreateRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PGPKeyCreateRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PGPKeyCreateRequestRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          description: No response body
+  /api/v1/signingkeys/{fingerprint}/:
+    get:
+      operationId: v1_signingkeys_retrieve
+      parameters:
+      - in: path
+        name: fingerprint
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PGPKey'
+          description: ''
+    put:
+      operationId: v1_signingkeys_update
+      parameters:
+      - in: path
+        name: fingerprint
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PGPKeyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PGPKeyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PGPKeyRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PGPKey'
+          description: ''
+    patch:
+      operationId: v1_signingkeys_partial_update
+      parameters:
+      - in: path
+        name: fingerprint
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPGPKeyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPGPKeyRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPGPKeyRequest'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PGPKey'
+          description: ''
+    delete:
+      operationId: v1_signingkeys_destroy
+      parameters:
+      - in: path
+        name: fingerprint
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/signingkeys/{fingerprint}/download/:
+    get:
+      operationId: v1_signingkeys_download_retrieve
+      description: Download the public PGP key in ASCII-armored format.
+      parameters:
+      - in: path
+        name: fingerprint
+        schema:
+          type: string
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/pgp-keys:
+              schema:
+                type: string
+                format: binary
+          description: ''
+  /api/v1/upload-status/{task_id}/:
+    get:
+      operationId: v1_upload_status_retrieve
+      parameters:
+      - in: path
+        name: task_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadTask'
+          description: ''
+  /api/v1/users/:
+    get:
+      operationId: v1_users_list
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUserList'
+          description: ''
+    post:
+      operationId: v1_users_create
+      description: API endpoint that allows users to be viewed or edited.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/v1/users/{id}/:
+    get:
+      operationId: v1_users_retrieve
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    put:
+      operationId: v1_users_update
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UserRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    patch:
+      operationId: v1_users_partial_update
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUserRequest'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+    delete:
+      operationId: v1_users_destroy
+      description: API endpoint that allows users to be viewed or edited.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: A unique integer value identifying this user.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/whoami:
+    get:
+      operationId: v1_whoami_retrieve
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+          description: ''
+  /api/whoami:
+    get:
+      operationId: whoami_retrieve
+      tags:
+      - whoami
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetail'
+          description: ''
+components:
+  schemas:
+    Build:
+      type: object
+      properties:
+        repo_uid:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+          readOnly: true
+        build_number:
+          type: integer
+        completion_status:
+          $ref: '#/components/schemas/CompletionStatusEnum'
+        total_duration_sec:
+          type: number
+          format: double
+          nullable: true
+      required:
+      - build_number
+      - repo_uid
+      - timestamp
+    BuildLog:
+      type: object
+      properties:
+        build:
+          type: integer
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+          readOnly: true
+        command:
+          type: string
+        message:
+          type: string
+        loglevel:
+          type: string
+          maxLength: 128
+        line_number:
+          type: integer
+        execution_time_sec:
+          type: number
+          format: double
+          nullable: true
+        exec_complete:
+          type: boolean
+      required:
+      - command
+      - line_number
+      - loglevel
+      - timestamp
+    CompletionStatusEnum:
+      enum:
+      - running
+      - complete_success
+      - complete_fail
+      type: string
+      description: |-
+        * `running` - Running
+        * `complete_success` - Completed Successfully
+        * `complete_fail` - Failed
+    CopyRequest:
+      type: object
+      properties:
+        dest_repo_uid:
+          type: string
+          minLength: 1
+      required:
+      - dest_repo_uid
+    ErrorResponse:
+      type: object
+      description: Standard error envelope returned by all API error responses.
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code (e.g. PACKAGE_EXISTS)
+        detail:
+          type: string
+          description: Human-readable error description
+        status:
+          type: integer
+          description: HTTP status code
+      required:
+      - code
+      - detail
+      - status
+    PGPKey:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 65536
+        email:
+          type: string
+          maxLength: 2048
+        fingerprint:
+          type: string
+          maxLength: 65535
+        creation_date:
+          type: string
+          format: date-time
+          readOnly: true
+        href:
+          type: string
+          format: uri
+          readOnly: true
+      required:
+      - creation_date
+      - email
+      - fingerprint
+      - href
+      - name
+    PGPKeyCreateRequestRequest:
+      type: object
+      description: Request body for generating a new PGP signing key.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Full name for the PGP key (1-1024 characters)
+        email:
+          type: string
+          format: email
+          minLength: 1
+          description: Email address for the PGP key
+      required:
+      - email
+      - name
+    PGPKeyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 65536
+        email:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        fingerprint:
+          type: string
+          minLength: 1
+          maxLength: 65535
+      required:
+      - email
+      - fingerprint
+      - name
+    PackageDetail:
+      type: object
+      properties:
+        package_uid:
+          type: string
+          maxLength: 65536
+        repo_uid:
+          type: string
+          readOnly: true
+        filename:
+          type: string
+          maxLength: 65536
+        version:
+          type: string
+          maxLength: 65536
+        architecture:
+          type: string
+          pattern: ^[a-zA-Z0-9_.+-]+$
+          maxLength: 256
+        checksum_sha512:
+          type: string
+          maxLength: 512
+        build_date:
+          type: string
+          format: date-time
+          nullable: true
+        upload_date:
+          type: string
+          format: date-time
+      required:
+      - architecture
+      - checksum_sha512
+      - filename
+      - package_uid
+      - repo_uid
+      - upload_date
+      - version
+    PackageDetailRequest:
+      type: object
+      properties:
+        package_uid:
+          type: string
+          minLength: 1
+          maxLength: 65536
+        filename:
+          type: string
+          minLength: 1
+          maxLength: 65536
+        version:
+          type: string
+          minLength: 1
+          maxLength: 65536
+        architecture:
+          type: string
+          minLength: 1
+          pattern: ^[a-zA-Z0-9_.+-]+$
+          maxLength: 256
+        checksum_sha512:
+          type: string
+          minLength: 1
+          maxLength: 512
+        build_date:
+          type: string
+          format: date-time
+          nullable: true
+        upload_date:
+          type: string
+          format: date-time
+      required:
+      - architecture
+      - checksum_sha512
+      - filename
+      - package_uid
+      - upload_date
+      - version
+    PackageSummary:
+      type: object
+      properties:
+        href_package:
+          type: string
+          format: uri
+          readOnly: true
+        package_uid:
+          type: string
+          maxLength: 65536
+        package_name:
+          type: string
+          maxLength: 65536
+        filename:
+          type: string
+          maxLength: 65536
+        architecture:
+          type: string
+          pattern: ^[a-zA-Z0-9_.+-]+$
+          maxLength: 256
+        upload_date:
+          type: string
+          format: date-time
+        version:
+          type: string
+          maxLength: 65536
+      required:
+      - architecture
+      - filename
+      - href_package
+      - package_name
+      - package_uid
+      - upload_date
+      - version
+    PaginatedBuildList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Build'
+    PaginatedBuildLogList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BuildLog'
+    PaginatedPGPKeyList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PGPKey'
+    PaginatedPackageSummaryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PackageSummary'
+    PaginatedRepoSummaryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepoSummary'
+    PaginatedUserList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+    PatchedPGPKeyRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 65536
+        email:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        fingerprint:
+          type: string
+          minLength: 1
+          maxLength: 65535
+    PatchedRepoSummaryRequest:
+      type: object
+      properties:
+        repo_uid:
+          type: string
+          minLength: 1
+          pattern: ^[a-zA-Z0-9][a-zA-Z0-9._-]*$
+          maxLength: 1024
+        repo_type:
+          $ref: '#/components/schemas/RepoTypeEnum'
+        package_count:
+          type: integer
+    PatchedUserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        is_superuser:
+          type: boolean
+          title: Superuser status
+          description: Designates that this user has all permissions without explicitly
+            assigning them.
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+    RepoDetail:
+      type: object
+      properties:
+        href_packages:
+          type: string
+          format: uri
+          readOnly: true
+        href_upload:
+          type: string
+          format: uri
+          readOnly: true
+        repo_uid:
+          type: string
+          pattern: ^[a-zA-Z0-9][a-zA-Z0-9._-]*$
+          maxLength: 1024
+        repo_type:
+          $ref: '#/components/schemas/RepoTypeEnum'
+        package_count:
+          type: integer
+        signing_key:
+          type: string
+          nullable: true
+        retention_policy:
+          $ref: '#/components/schemas/RetentionPolicyEnum'
+        retention_keep_count:
+          type: integer
+          nullable: true
+        retention_max_age_days:
+          type: integer
+          nullable: true
+        multi_arch:
+          type: boolean
+        last_updated:
+          type: string
+          format: date-time
+          readOnly: true
+        promote_to:
+          type: string
+          nullable: true
+        repo_instructions:
+          type: string
+          readOnly: true
+        write_access:
+          type: array
+          items:
+            type: string
+          readOnly: true
+      required:
+      - href_packages
+      - href_upload
+      - last_updated
+      - repo_instructions
+      - repo_type
+      - repo_uid
+      - write_access
+    RepoDetailRequest:
+      type: object
+      properties:
+        repo_uid:
+          type: string
+          minLength: 1
+          pattern: ^[a-zA-Z0-9][a-zA-Z0-9._-]*$
+          maxLength: 1024
+        repo_type:
+          $ref: '#/components/schemas/RepoTypeEnum'
+        package_count:
+          type: integer
+        signing_key:
+          type: string
+          minLength: 1
+          nullable: true
+        retention_policy:
+          $ref: '#/components/schemas/RetentionPolicyEnum'
+        retention_keep_count:
+          type: integer
+          nullable: true
+        retention_max_age_days:
+          type: integer
+          nullable: true
+        multi_arch:
+          type: boolean
+        promote_to:
+          type: string
+          minLength: 1
+          nullable: true
+      required:
+      - repo_type
+      - repo_uid
+    RepoSummary:
+      type: object
+      properties:
+        href_repo:
+          type: string
+          format: uri
+          readOnly: true
+        href_packages:
+          type: string
+          format: uri
+          readOnly: true
+        repo_uid:
+          type: string
+          pattern: ^[a-zA-Z0-9][a-zA-Z0-9._-]*$
+          maxLength: 1024
+        repo_type:
+          $ref: '#/components/schemas/RepoTypeEnum'
+        package_count:
+          type: integer
+        last_updated:
+          type: string
+          format: date-time
+          readOnly: true
+        promote_to:
+          type: string
+          readOnly: true
+          nullable: true
+      required:
+      - href_packages
+      - href_repo
+      - last_updated
+      - promote_to
+      - repo_type
+      - repo_uid
+    RepoSummaryRequest:
+      type: object
+      properties:
+        repo_uid:
+          type: string
+          minLength: 1
+          pattern: ^[a-zA-Z0-9][a-zA-Z0-9._-]*$
+          maxLength: 1024
+        repo_type:
+          $ref: '#/components/schemas/RepoTypeEnum'
+        package_count:
+          type: integer
+      required:
+      - repo_type
+      - repo_uid
+    RepoTypeEnum:
+      enum:
+      - deb
+      - rpm
+      - apk
+      - files
+      type: string
+      description: |-
+        * `deb` - Debian/APT
+        * `rpm` - Red Hat/RPM
+        * `apk` - Alpine/APK
+        * `files` - Generic Files
+    RetentionPolicyEnum:
+      enum:
+      - none
+      - keep_latest_n
+      - max_age_days
+      - keep_latest_n_and_age
+      type: string
+      description: |-
+        * `none` - Keep everything
+        * `keep_latest_n` - Keep latest N versions
+        * `max_age_days` - Delete packages older than N days
+        * `keep_latest_n_and_age` - Keep latest N versions OR delete older than N days
+    UploadRequest:
+      type: object
+      properties:
+        package_file:
+          type: string
+          format: binary
+        overwrite:
+          type: string
+          minLength: 1
+          description: Set to "1", "true", or "yes" to overwrite existing.
+      required:
+      - package_file
+    UploadResponse:
+      type: object
+      description: Response returned by the upload endpoint (HTTP 202 Accepted).
+      properties:
+        task_id:
+          type: string
+          format: uuid
+          description: ID for polling upload status via /api/upload-status/<task_id>/
+      required:
+      - task_id
+    UploadTask:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        status:
+          type: string
+          maxLength: 20
+        filename:
+          type: string
+          maxLength: 65536
+        filesize:
+          type: integer
+        error_message:
+          type: string
+        error_code:
+          type: string
+          maxLength: 64
+        result_data:
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - created_at
+      - filename
+      - id
+    User:
+      type: object
+      properties:
+        href:
+          type: string
+          format: uri
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        is_superuser:
+          type: boolean
+          title: Superuser status
+          description: Designates that this user has all permissions without explicitly
+            assigning them.
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+      required:
+      - href
+      - username
+    UserDetail:
+      type: object
+      properties:
+        href:
+          type: string
+          format: uri
+          readOnly: true
+        username:
+          type: string
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        is_superuser:
+          type: boolean
+          title: Superuser status
+          description: Designates that this user has all permissions without explicitly
+            assigning them.
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+        api_key:
+          type: string
+          readOnly: true
+      required:
+      - api_key
+      - href
+      - username
+    UserRequest:
+      type: object
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Required. 150 characters or fewer. Letters, digits and @/./+/-/_
+            only.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        is_superuser:
+          type: boolean
+          title: Superuser status
+          description: Designates that this user has all permissions without explicitly
+            assigning them.
+        email:
+          type: string
+          format: email
+          title: Email address
+          maxLength: 254
+      required:
+      - username
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Token-based authentication with required prefix "Token"
+tags:
+- name: repos
+  description: Repository management
+- name: packages
+  description: Package listing and details
+- name: upload
+  description: Package upload and status
+- name: signing-keys
+  description: PGP signing key management
+- name: builds
+  description: Build history and logs
+- name: auth
+  description: Authentication and user info
