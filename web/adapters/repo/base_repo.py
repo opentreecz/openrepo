@@ -63,8 +63,6 @@ class BaseRepoAdapter:
         """
         if repo_db_obj is not None:
             # Legacy path — construct from Django ORM model
-            from adapters.repo import get_repo_adapter as _compat
-            # Re-use the compat factory to populate fields
             self._init_from_model(repo_db_obj)
             return
 
@@ -123,17 +121,28 @@ class BaseRepoAdapter:
 
         # Lightweight no-op build logger
         class _NoopBuildLogger:
+
             def write(self, command, message="", loglevel="info", is_complete=True):
+
                 class _Line:
                     pass
+
                 return _Line()
+
             def section(self, command, loglevel="info"):
+
                 @contextlib.contextmanager
                 def _noop():
+
                     class _Entry:
-                        def set_message(self, m): pass
-                        def set_loglevel(self, l): pass
+                        def set_message(self, msg):
+                            pass
+
+                        def set_loglevel(self, level):
+                            pass
+
                     yield _Entry()
+
                 return _noop()
 
         self.build_logger = _NoopBuildLogger()

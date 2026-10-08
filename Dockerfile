@@ -36,6 +36,7 @@ WORKDIR /app
 
 
 # Copy the requirements.txt first and install dependencies, so that this can be cached
+COPY openrepo_adapters/ ./openrepo_adapters/
 COPY web/requirements.txt ./django/requirements.txt
 COPY web/constraints.txt ./django/constraints.txt
 RUN python3 -m venv /venv
@@ -43,6 +44,7 @@ ENV PATH="/venv/bin:$PATH"
 ENV PIP_CONSTRAINT=/app/django/constraints.txt
 
 RUN ln -s /usr/bin/createrepo_c /usr/bin/createrepo && \
+    pip3 install --no-cache-dir ./openrepo_adapters && \
     pip3 install --no-cache-dir -r django/requirements.txt && \
     mkdir -p /var/lib/openrepo/packages/
 

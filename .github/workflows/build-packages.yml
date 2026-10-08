@@ -74,6 +74,7 @@ jobs:
               cd /src
 
               python3 -m venv /tmp/openrepo-deb/opt/openrepo/venv
+              PIP_CONSTRAINT=web/constraints.txt /tmp/openrepo-deb/opt/openrepo/venv/bin/pip install --no-cache-dir ./openrepo_adapters
               PIP_CONSTRAINT=web/constraints.txt /tmp/openrepo-deb/opt/openrepo/venv/bin/pip install --no-cache-dir -r web/requirements.txt
 
               cp -r web/* /tmp/openrepo-deb/opt/openrepo/
@@ -152,7 +153,7 @@ jobs:
 
               # Create source tarball
               mkdir -p openrepo-${VERSION}
-              cp -r web frontend cli deploy packaging .env.example openrepo-${VERSION}/
+              cp -r web frontend cli deploy packaging openrepo_adapters .env.example openrepo-${VERSION}/
               tar czf ~/rpmbuild/SOURCES/openrepo-${VERSION}.tar.gz openrepo-${VERSION}
 
               # Build the RPM
