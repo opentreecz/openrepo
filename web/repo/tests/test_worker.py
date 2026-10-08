@@ -58,47 +58,41 @@ class WorkerTestCase(TestCase):
         # Now it should be available again
         self.assertEqual(cl.get_next_task(), repo_uid)
 
-    @patch("adapters.repo.get_repo_adapter")
-    def test_worker_processes_stale_repo(self, mock_get_adapter):
-        """Test that the worker picks up a stale repo, resets the flag, and calls setup_repo"""
-        # Mock the adapter
-        mock_adapter = MagicMock()
-        mock_get_adapter.return_value = mock_adapter
+    @patch("repo.worker.bgworker.build_repo")
+    def test_worker_processes_stale_repo(self, mock_build_repo):
+        """Test that the worker picks up a stale repo, resets the flag, and calls build_repo"""
+        mock_build_repo.return_value = True
 
         cl = ChoreList()
         cl.set_needs_clean(self.repo.repo_uid)
 
         BackgroundWorker(cl)
-        # We don't want the worker to run in a loop forever during the test
-        # We'll call the inner logic once instead of starting the thread
-        # Or we can just run it briefly
 
         # Simulate one iteration of the worker.run() loop
         repo_uid = cl.get_next_task()
         self.assertEqual(repo_uid, self.repo.repo_uid)
 
-        # The logic inside worker.run()
+        # The logic inside worker.run() now calls build_repo
+        success = mock_build_repo(repo_uid)
+        self.assertTrue(success)
+
         repo = Repository.objects.get(repo_uid=repo_uid)
         repo.is_stale = False
         repo.save()
-
-        adapter = mock_get_adapter(repo)
-        adapter.setup_repo()
 
         cl.cleaning_done(repo_uid)
 
         # Verify
         self.repo.refresh_from_db()
         self.assertFalse(self.repo.is_stale)
-        self.assertTrue(mock_adapter.setup_repo.called)
+        self.assertTrue(mock_build_repo.called)
         self.assertIsNone(cl.get_next_task())
 
     @patch("repo.worker.bgworker.time.sleep")
-    @patch("repo.worker.bgworker.get_repo_adapter")
-    def test_run_processes_task_and_exits_on_stop(self, mock_get_adapter, mock_sleep):
+    @patch("repo.worker.bgworker.build_repo")
+    def test_run_processes_task_and_exits_on_stop(self, mock_build_repo, mock_sleep):
         """BackgroundWorker.run() picks up a queued repo, refreshes it, then stops"""
-        mock_adapter = MagicMock()
-        mock_get_adapter.return_value = mock_adapter
+        mock_build_repo.return_value = True
 
         cl = ChoreList()
         cl.set_needs_clean(self.repo.repo_uid)
@@ -114,7 +108,7 @@ class WorkerTestCase(TestCase):
 
         self.repo.refresh_from_db()
         self.assertFalse(self.repo.is_stale)
-        mock_adapter.setup_repo.assert_called_once()
+        mock_build_repo.assert_called_once_with(self.repo.repo_uid)
         self.assertIsNone(cl.get_next_task())
 
     @patch("repo.worker.bgworker.time.sleep")
@@ -133,12 +127,10 @@ class WorkerTestCase(TestCase):
         mock_sleep.assert_called_once()
 
     @patch("repo.worker.bgworker.time.sleep")
-    @patch("repo.worker.bgworker.get_repo_adapter")
-    def test_run_survives_exception_and_still_marks_task_done(self, mock_get_adapter, mock_sleep):
-        """BackgroundWorker.run() logs and continues if the adapter raises, still releasing the task"""
-        mock_adapter = MagicMock()
-        mock_adapter.setup_repo.side_effect = RuntimeError("boom")
-        mock_get_adapter.return_value = mock_adapter
+    @patch("repo.worker.bgworker.build_repo")
+    def test_run_survives_exception_and_still_marks_task_done(self, mock_build_repo, mock_sleep):
+        """BackgroundWorker.run() logs and continues if build_repo raises, still releasing the task"""
+        mock_build_repo.side_effect = RuntimeError("boom")
 
         cl = ChoreList()
         cl.set_needs_clean(self.repo.repo_uid)

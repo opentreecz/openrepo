@@ -20,7 +20,7 @@ import time
 from django.conf import settings
 from django.db import close_old_connections
 
-from adapters.repo import get_repo_adapter
+from adapters.repo.orchestrator import build_repo
 from repo.api.retention import apply_retention_policy_repo
 from repo.models import Repository
 
@@ -130,13 +130,15 @@ class BackgroundWorker(threading.Thread):
                     try:
                         logger.info(f"Worker triggering update of repo {next_task_repo_uid}")
 
-                        repo = Repository.objects.get(repo_uid=next_task_repo_uid)
-                        adapter = get_repo_adapter(repo)
-                        adapter.setup_repo()
+                        success = build_repo(next_task_repo_uid)
 
-                        repo.is_stale = False
-                        repo.save()
-                        self._record_success(next_task_repo_uid)
+                        if success:
+                            repo = Repository.objects.get(repo_uid=next_task_repo_uid)
+                            repo.is_stale = False
+                            repo.save()
+                            self._record_success(next_task_repo_uid)
+                        else:
+                            self._record_failure(next_task_repo_uid)
 
                     except Repository.DoesNotExist:
                         logger.info(

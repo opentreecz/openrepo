@@ -61,6 +61,7 @@ services:
       - OPENREPO_PG_PORT=5432
       # REQUIRED — server refuses to start without this.
       - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
+      - OPENREPO_REDIS_URL=redis://redis:6379/0
       # Optional overrides (uncomment to customize):
       # - OPENREPO_DEBUG=FALSE
       # - OPENREPO_DOMAIN=repo.example.com
@@ -84,7 +85,7 @@ services:
   worker:
     build: .
     image: ghcr.io/opentreecz/openrepo:latest
-    command: ./django/manage.py runworker
+    command: celery -A openrepo worker -l info --concurrency=4
     restart: unless-stopped
     volumes:
       - openrepo-data:/var/lib/openrepo
@@ -96,12 +97,50 @@ services:
       - OPENREPO_PG_HOSTNAME=db
       - OPENREPO_PG_PORT=5432
       - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
+      - OPENREPO_REDIS_URL=redis://redis:6379/0
     depends_on:
       django:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'manage.py runworker' || exit 1"]
+      test: ["CMD-SHELL", "celery -A openrepo inspect ping 2>/dev/null || exit 1"]
       interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Beat — periodic task scheduler (retention sweeps, stale repo polling)
+  # ---------------------------------------------------------------------------
+  beat:
+    build: .
+    image: ghcr.io/opentreecz/openrepo:latest
+    command: celery -A openrepo beat -l info --schedule=/tmp/celerybeat-schedule
+    restart: unless-stopped
+    environment:
+      - OPENREPO_DB_TYPE=postgresql
+      - OPENREPO_PG_DATABASE=${OPENREPO_PG_DATABASE:-openrepo}
+      - OPENREPO_PG_USERNAME=${OPENREPO_PG_USERNAME:-postgres}
+      - OPENREPO_PG_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
+      - OPENREPO_PG_HOSTNAME=db
+      - OPENREPO_PG_PORT=5432
+      - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
+      - OPENREPO_REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Redis — message broker for Celery task queue
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
       timeout: 5s
       retries: 3
 

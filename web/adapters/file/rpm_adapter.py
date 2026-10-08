@@ -1,46 +1,18 @@
-from datetime import datetime, timezone
+# Thin wrapper — the canonical implementation now lives in the
+# standalone ``openrepo_adapters`` package.
+#
+# This wrapper auto-injects Django's RPM_VERSION_IGNORE_BUILD_NUM setting
+# so that existing code constructing RpmFileAdapter directly continues to
+# work without changes.
 
-import rpmfile
-from dateutil import parser
 from django.conf import settings
+from openrepo_adapters.rpm import RpmFileAdapter as _RpmFileAdapter
 
-from .base_adapter import RepoFileAdapter
 
+class RpmFileAdapter(_RpmFileAdapter):
+    """Django-aware wrapper that auto-injects the ignore_build_num setting."""
 
-class RpmFileAdapter(RepoFileAdapter):
-
-    def __init__(self, filepath, original_filename=None):
-        super().__init__(filepath, original_filename)
-
-        with rpmfile.open(self.filepath) as rpm:
-            self.fields = {}
-            for header in ("name", "version", "release", "arch", "group",
-                           "size", "copyright", "signature", "sourcerpm",
-                           "buildtime", "buildhost", "url", "summary",
-                           "description"):
-                value = rpm.headers.get(header)
-                if isinstance(value, bytes):
-                    value = value.decode("utf-8", errors="replace")
-                if header == "buildtime":
-                    value = datetime.fromtimestamp(value, tz=timezone.utc).strftime("%c")
-                if header == "description":
-                    value = "\n" + value
-                self.fields[header] = value
-
-    def get_name(self):
-        return self.fields["name"]
-
-    def get_architecture(self):
-        return self.fields["arch"]
-
-    def get_version(self):
-        if settings.RPM_VERSION_IGNORE_BUILD_NUM:
-            return self.fields["version"]
-        else:
-            return self.fields["version"] + "." + self.fields["release"]
-
-    def get_description(self):
-        return self.fields["description"]
-
-    def get_builddate(self):
-        return parser.parse(self.fields["buildtime"])
+    def __init__(self, filepath, original_filename=None, *, ignore_build_num=None):
+        if ignore_build_num is None:
+            ignore_build_num = getattr(settings, "RPM_VERSION_IGNORE_BUILD_NUM", False)
+        super().__init__(filepath, original_filename, ignore_build_num=ignore_build_num)

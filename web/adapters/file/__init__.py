@@ -14,19 +14,25 @@
 
 import logging
 
-from .deb_adapter import DebFileAdapter  # noqa: F401
-from .file_adapter import GenericFileAdapter  # noqa: F401
-from .rpm_adapter import RpmFileAdapter  # noqa: F401
+from openrepo_adapters import (  # noqa: F401
+    ApkFileAdapter,
+    DebFileAdapter,
+    GenericFileAdapter,
+    RpmFileAdapter,
+)
+from openrepo_adapters import create_adapter as _create_adapter
 
 logger = logging.getLogger("openrepo_web")
 
 
 def create_adapter(repo_type, filepath, original_filename):
-    """Return the appropriate file adapter for the given repo type."""
-    from adapters.registry import FILE_ADAPTERS
+    """Return the appropriate file adapter for the given repo type.
 
-    adapter_cls = FILE_ADAPTERS.get(repo_type)
-    if adapter_cls is None:
-        logger.warning(f"Unable to determine file adapter from repo type {repo_type}")
-        return None
-    return adapter_cls(filepath, original_filename)
+    Wraps the standalone ``openrepo_adapters.create_adapter`` factory,
+    injecting Django settings where needed (e.g., RPM_VERSION_IGNORE_BUILD_NUM).
+    """
+    kwargs = {}
+    if repo_type == "rpm":
+        from django.conf import settings
+        kwargs["ignore_build_num"] = getattr(settings, "RPM_VERSION_IGNORE_BUILD_NUM", False)
+    return _create_adapter(repo_type, filepath, original_filename, **kwargs)

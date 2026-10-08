@@ -1,8 +1,6 @@
 # Alpine APK repository adapter.
 #
 # Generates an APKINDEX.tar.gz file that Alpine's apk-tools can consume.
-# Each package in the repo gets an entry in the APKINDEX text file,
-# which is then packed into a gzipped tar archive.
 
 import base64
 import gzip
@@ -43,18 +41,14 @@ class ApkRepoAdapter(BaseRepoAdapter):
             log_entry.set_message(f"Generated APKINDEX.tar.gz with {len(entries)} package(s)")
 
         # Export PGP public key if configured
-        if self.pgp_key is not None:
+        if self.signing_key is not None:
             self._save_public_key(repo_path)
 
         return True
 
 
 def _build_index_entry(pkg, repo_path):
-    """Build an APKINDEX entry block for a single package.
-
-    Returns a string of ``K:value`` lines, or ``None`` if the package
-    file cannot be read.
-    """
+    """Build an APKINDEX entry block for a single package."""
     ext = os.path.splitext(pkg.filename)[1]
     pool_name = f"{pkg.package_name}_{pkg.version}_{pkg.architecture}{ext}"
     apk_path = os.path.join(repo_path, pool_name)
@@ -63,9 +57,6 @@ def _build_index_entry(pkg, repo_path):
         logger.warning("APK file not found for index: %s", apk_path)
         return None
 
-    # Compute the checksum of the control section.
-    # For simplicity we hash the entire .apk file with SHA1 and use the
-    # Q1<base64> format that apk-tools expects.
     try:
         file_size = os.path.getsize(apk_path)
         control_hash = _sha1_file(apk_path)
@@ -95,14 +86,12 @@ def _write_apkindex_tar_gz(repo_path, index_text, repo_uid):
 
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w") as tar:
-        # DESCRIPTION entry (optional but good practice)
         desc = f"OpenRepo Alpine repository: {repo_uid}\n".encode("utf-8")
         desc_info = tarfile.TarInfo(name="DESCRIPTION")
         desc_info.size = len(desc)
         desc_info.mtime = now
         tar.addfile(desc_info, io.BytesIO(desc))
 
-        # APKINDEX entry
         info = tarfile.TarInfo(name="APKINDEX")
         info.size = len(index_bytes)
         info.mtime = now

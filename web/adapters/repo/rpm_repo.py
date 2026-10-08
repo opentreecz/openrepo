@@ -15,30 +15,17 @@
 import logging
 import os
 
-from django.conf import settings
-
 from .base_repo import BaseRepoAdapter
 
 logger = logging.getLogger("openrepo_web")
 
-# Default architecture used as fallback when a multi_arch RPM repo has no
-# packages yet (so that an empty repo still generates a valid structure).
 RPM_ARCH_DEFAULT = "x86_64"
 
 
 class RpmRepoAdapter(BaseRepoAdapter):
 
     def _get_architectures(self):
-        """
-        Return the list of distinct architectures present in the repo's package set.
-
-        In multi_arch mode: collect real architectures from packages (excluding noarch).
-        In legacy mode: return None (no per-arch splitting).
-
-        Falls back to [RPM_ARCH_DEFAULT] when no packages exist yet so that
-        an empty multi_arch repo still generates a valid structure.
-        """
-        if not self.repo_db_obj.multi_arch:
+        if not self.multi_arch:
             return None
 
         arches = sorted(set(
@@ -50,12 +37,9 @@ class RpmRepoAdapter(BaseRepoAdapter):
     def _get_repo_instructions(self):
         repo_cfg_file = f"/etc/yum.repos.d/{self.repo_uid}.repo"
 
-        if self.repo_db_obj.multi_arch:
-            # Multi-arch mode: use $basearch variable in baseurl
-            # DNF/YUM resolves $basearch to the client's architecture (e.g., x86_64, aarch64)
+        if self.multi_arch:
             baseurl = f"{self.base_url}/$basearch"
         else:
-            # Legacy mode: flat directory
             baseurl = self.base_url
 
         repo_instr = 'echo """\n'
@@ -78,27 +62,8 @@ class RpmRepoAdapter(BaseRepoAdapter):
             return self._generate_legacy(repo_path)
 
     def _generate_multi_arch(self, repo_path, architectures):
-        """
-        Generate per-architecture subdirectories with separate repodata.
-
-        Structure:
-            repo/
-              x86_64/
-                repodata/repomd.xml
-                myapp-1.0-1.x86_64.rpm
-                common-1.0-1.noarch.rpm   <- noarch duplicated here
-              aarch64/
-                repodata/repomd.xml
-                myapp-1.0-1.aarch64.rpm
-                common-1.0-1.noarch.rpm   <- noarch duplicated here
-              public.gpg
-
-        noarch packages are symlinked into EVERY architecture directory
-        (same pattern as Debian's Architecture: all handling).
-        """
         noarch_packages = [p for p in self.packages if p.architecture == "noarch"]
 
-        # Each command is a (args_list, output_file_or_None) tuple.
         exec_commands = []
         use_python_tools = os.environ.get("OPENREPO_USE_PYTHON_TOOLS") == "1"
 
@@ -106,7 +71,6 @@ class RpmRepoAdapter(BaseRepoAdapter):
             arch_dir = os.path.join(repo_path, arch)
             os.makedirs(arch_dir, exist_ok=True)
 
-            # Symlink arch-specific packages into the arch directory
             arch_packages = [p for p in self.packages if p.architecture == arch]
             self._copy_packages(arch_dir, packages=arch_packages + noarch_packages)
 
@@ -114,15 +78,14 @@ class RpmRepoAdapter(BaseRepoAdapter):
                 from .fallback_tools import generate_rpm_repodata
                 generate_rpm_repodata(arch_dir)
             else:
-                if not os.path.isdir(settings.RPM_CACHE_DIR):
-                    os.makedirs(settings.RPM_CACHE_DIR)
+                if not os.path.isdir(self.config.rpm_cache_dir):
+                    os.makedirs(self.config.rpm_cache_dir)
                 exec_commands.append((
-                    ["createrepo", "--cachedir", settings.RPM_CACHE_DIR, arch_dir],
+                    ["createrepo", "--cachedir", self.config.rpm_cache_dir, arch_dir],
                     None,
                 ))
 
-        # GPG signing
-        if self.pgp_key is None:
+        if self.signing_key is None:
             self._buildlog_write(
                 "Missing PGP Key",
                 "PGP key not configured for this repo.  Signing disabled",
@@ -135,7 +98,7 @@ class RpmRepoAdapter(BaseRepoAdapter):
                 exec_commands.append((
                     [
                         "gpg", "--detach-sign", "--yes",
-                        "--local-user", self.pgp_key.fingerprint,
+                        "--local-user", self.signing_key.fingerprint,
                         "--armor", repomd_path,
                     ],
                     None,
@@ -145,27 +108,22 @@ class RpmRepoAdapter(BaseRepoAdapter):
         return self._execute_commands(exec_commands, repo_path)
 
     def _generate_legacy(self, repo_path):
-        """
-        Legacy flat directory mode (multi_arch=False).
-        All packages in one directory, single createrepo run.
-        """
         self._copy_packages(repo_path)
 
         use_python_tools = os.environ.get("OPENREPO_USE_PYTHON_TOOLS") == "1"
-        # Each command is a (args_list, output_file_or_None) tuple.
         exec_commands = []
 
         if use_python_tools:
             from .fallback_tools import generate_rpm_repodata
             generate_rpm_repodata(repo_path)
         else:
-            if not os.path.isdir(settings.RPM_CACHE_DIR):
-                os.makedirs(settings.RPM_CACHE_DIR)
+            if not os.path.isdir(self.config.rpm_cache_dir):
+                os.makedirs(self.config.rpm_cache_dir)
             exec_commands = [
-                (["createrepo", "--cachedir", settings.RPM_CACHE_DIR, repo_path], None),
+                (["createrepo", "--cachedir", self.config.rpm_cache_dir, repo_path], None),
             ]
 
-        if self.pgp_key is None:
+        if self.signing_key is None:
             self._buildlog_write(
                 "Missing PGP Key",
                 "PGP key not configured for this repo.  Signing disabled",
@@ -176,7 +134,7 @@ class RpmRepoAdapter(BaseRepoAdapter):
             exec_commands.append((
                 [
                     "gpg", "--detach-sign", "--yes",
-                    "--local-user", self.pgp_key.fingerprint,
+                    "--local-user", self.signing_key.fingerprint,
                     "--armor", repomd_path,
                 ],
                 None,
