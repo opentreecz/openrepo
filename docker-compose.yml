@@ -72,6 +72,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "/app/django/manage.py migrate --check"]
       interval: 10s
@@ -86,6 +88,7 @@ services:
     build: .
     image: ghcr.io/opentreecz/openrepo:latest
     command: celery -A openrepo worker -l info --concurrency=4
+    working_dir: /app/django
     restart: unless-stopped
     volumes:
       - openrepo-data:/var/lib/openrepo
@@ -104,7 +107,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "celery -A openrepo inspect ping 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "cd /app/django && celery -A openrepo inspect ping 2>/dev/null || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -116,6 +119,7 @@ services:
     build: .
     image: ghcr.io/opentreecz/openrepo:latest
     command: celery -A openrepo beat -l info --schedule=/tmp/celerybeat-schedule
+    working_dir: /app/django
     restart: unless-stopped
     environment:
       - OPENREPO_DB_TYPE=postgresql
