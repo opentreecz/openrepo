@@ -69,25 +69,33 @@ def get_repo_adapter(repo_obj):
             private_key_pem=repo_obj.signing_key.private_key_pem,
         )
 
-    from .django_build_logger import DjangoBuildLogger
-    from repo.models import Build
-
     # Lightweight no-op build logger for read-only usage (e.g. serializers
     # calling _get_repo_instructions).  A real build logger is created by
     # the orchestrator when actually generating repo metadata.
     class _NoopBuildLogger:
+
         def write(self, command, message="", loglevel="info", is_complete=True):
+
             class _Line:
                 pass
+
             return _Line()
+
         def section(self, command, loglevel="info"):
             import contextlib
+
             @contextlib.contextmanager
             def _noop():
+
                 class _Entry:
-                    def set_message(self, m): pass
-                    def set_loglevel(self, l): pass
+                    def set_message(self, msg):
+                        pass
+
+                    def set_loglevel(self, level):
+                        pass
+
                 yield _Entry()
+
             return _noop()
 
     build_logger = _NoopBuildLogger()

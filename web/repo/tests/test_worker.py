@@ -1,6 +1,6 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import time
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.conf import settings
 from django.test import TestCase

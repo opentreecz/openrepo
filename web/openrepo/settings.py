@@ -338,7 +338,7 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 # Make Celery tasks execute synchronously during tests.
 # Auto-detect test mode: Django sets up an in-memory DB or the test runner
 # passes 'test' as the first management command argument.
-import sys
+import sys  # noqa: E402
 _is_testing = "test" in sys.argv or os.getenv("OPENREPO_CELERY_EAGER", "0") == "1"
 CELERY_TASK_ALWAYS_EAGER = _is_testing
 CELERY_TASK_EAGER_PROPAGATES = _is_testing

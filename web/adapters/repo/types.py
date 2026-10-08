@@ -5,10 +5,8 @@ allowing them to be tested and potentially reused outside of Django.
 """
 from __future__ import annotations
 
-import time
-from contextlib import contextmanager
-from dataclasses import dataclass, field
-from typing import ContextManager, List, Optional, Protocol
+from dataclasses import dataclass
+from typing import ContextManager, Optional, Protocol
 
 
 @dataclass(frozen=True)
@@ -31,7 +29,7 @@ class RepoConfig:
     repo_www_path: str      # where repo output goes
     keyring_path: str       # GPG home directory
     deb_db_path: str = ""   # apt-ftparchive DB cache
-    rpm_cache_dir: str = "" # createrepo cache dir
+    rpm_cache_dir: str = ""  # createrepo cache dir
     subprocess_timeout: int = 600
 
 

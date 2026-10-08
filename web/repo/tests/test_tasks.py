@@ -2,12 +2,12 @@
 import os
 import shutil
 import tempfile
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from django.conf import settings
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
-from repo.models import Build, Package, PGPSigningKey, Repository, UploadTask
+from repo.models import Build, PGPSigningKey, Repository
 
 
 class ProcessUploadTaskTest(TestCase):
@@ -106,7 +106,7 @@ class CheckStaleReposTaskTest(TestCase):
             name="Stale Key", email="stale@test.com", fingerprint="STALE_FP_1",
             public_key_pem="pub", private_key_pem="priv",
         )
-        repo = Repository.objects.create(
+        Repository.objects.create(
             repo_uid="stale-check-repo", repo_type="files", signing_key=key, is_stale=True,
         )
         with patch("repo.tasks.rebuild_repo_task.apply_async") as mock_apply:
