@@ -12,49 +12,19 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+"""Base repo adapter — Django-free.
+
+All Django ORM interactions (Build records, Package queries, settings) are
+handled by the orchestrator (``orchestrator.py``).  This module receives
+its dependencies via constructor injection.
+"""
+
 import logging
 import os
 import shutil
 import subprocess
-import time
-
-from django.conf import settings
-from django.db.models import F
-
-from repo.models import Build, BuildLogLine, Package, Repository
-from repo.storage.keyring import PGPKeyring
 
 logger = logging.getLogger("openrepo_web")
-
-
-class BuildLogEntry:
-    """
-    Used to annotate sections of work during the build process.  Execution time is recorded,
-    and messages are updated on the db after the command is written so that the web ui can display
-    in real-time
-    """
-
-    def __init__(self, command, log_line, repo_uid):
-        self.start_timestamp = time.time()
-        self.command = command
-        self.log_line = log_line
-        self.repo_uid = repo_uid
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.log_line.execution_time_sec = time.time() - self.start_timestamp
-        self.log_line.exec_complete = True
-
-        self.log_line.save()
-
-    def set_message(self, message):
-        self.log_line.message = message
-        logger.info(f"build {self.repo_uid}: {message}")
-
-    def set_loglevel(self, loglevel):
-        self.log_line.loglevel = loglevel
 
 
 class BaseRepoAdapter:
@@ -64,37 +34,158 @@ class BaseRepoAdapter:
     BUILDLOG_WARNING = "warning"
     BUILDLOG_ERROR = "error"
 
-    def __init__(self, repo_db_obj):
+    # Subprocess timeout in seconds — prevents indefinite hangs from
+    # createrepo, apt-ftparchive, or gpg.
+    SUBPROCESS_TIMEOUT = 600
+
+    def __init__(self, repo_db_obj=None, *, repo_uid=None, packages=None, config=None,
+                 build_logger=None, signing_key=None, signer=None, base_url="",
+                 multi_arch=False):
+        """
+        Supports two calling conventions:
+
+        **New (injected dependencies):**
+            Adapter(repo_uid=..., packages=[...], config=..., build_logger=...)
+
+        **Legacy (Django model — backward compat for tests/serializers):**
+            Adapter(repo_db_obj)
+
+        Args:
+            repo_db_obj: Legacy positional — a Django Repository model instance.
+            repo_uid: Repository identifier string.
+            packages: List of ``PackageInfo`` dataclasses.
+            config: ``RepoConfig`` with filesystem paths.
+            build_logger: Object implementing ``BuildLogWriter`` protocol.
+            signing_key: Optional ``SigningKeyInfo`` for PGP signing.
+            signer: Optional ``RepoSigner`` for GPG keyring operations.
+            base_url: Base URL for repo instructions.
+            multi_arch: Whether to generate per-architecture directories.
+        """
+        if repo_db_obj is not None:
+            # Legacy path — construct from Django ORM model
+            from adapters.repo import get_repo_adapter as _compat
+            # Re-use the compat factory to populate fields
+            self._init_from_model(repo_db_obj)
+            return
+
+        self.repo_uid = repo_uid
+        self.packages = packages or []
+        self.config = config
+        self.build_logger = build_logger
+        self.signing_key = signing_key
+        self.signer = signer
+        self.base_url = base_url
+        self.multi_arch = multi_arch
+
+    def _init_from_model(self, repo_db_obj):
+        """Initialize from a legacy Django Repository model."""
+        import contextlib
+        from django.conf import settings
 
         self.repo_uid = repo_db_obj.repo_uid
-        self.pgp_key = repo_db_obj.signing_key
-        self.repo_db_obj = repo_db_obj
-
-        self.build = None
-        self.log_number = 0
-        # The <origin> tab will get swapped out in JavaScript by the browser
+        self.multi_arch = repo_db_obj.multi_arch
         self.base_url = f"<origin>/{self.repo_uid}"
 
-        # Initialize packages queryset for use by _get_repo_instructions() and similar.
-        # setup_repo() will re-assign this before repo generation.
-        self.packages = Package.objects.filter(repo__repo_uid=self.repo_uid)
+        # Lazy import to avoid circular deps
+        from adapters.repo.types import PackageInfo, RepoConfig, SigningKeyInfo
+        from repo.models import Package
+
+        self.packages = [
+            PackageInfo(
+                package_uid=p.package_uid,
+                filename=p.filename,
+                package_name=p.package_name,
+                architecture=p.architecture,
+                version=p.version,
+                relative_path=p.relative_path(),
+                checksum_sha512=p.checksum_sha512,
+                upload_date=p.upload_date.isoformat() if p.upload_date else None,
+            )
+            for p in Package.objects.filter(repo__repo_uid=self.repo_uid)
+        ]
+
+        self.config = RepoConfig(
+            storage_path=settings.STORAGE_PATH,
+            repo_www_path=settings.REPO_WWW_PATH,
+            keyring_path=settings.KEYRING_PATH,
+            deb_db_path=getattr(settings, "DEB_DB_PATH", ""),
+            rpm_cache_dir=getattr(settings, "RPM_CACHE_DIR", ""),
+        )
+
+        self.signing_key = None
+        if repo_db_obj.signing_key:
+            self.signing_key = SigningKeyInfo(
+                fingerprint=repo_db_obj.signing_key.fingerprint,
+                public_key_pem=repo_db_obj.signing_key.public_key_pem,
+                passphrase=repo_db_obj.signing_key.passphrase,
+                private_key_pem=repo_db_obj.signing_key.private_key_pem,
+            )
+
+        # Lightweight no-op build logger
+        class _NoopBuildLogger:
+            def write(self, command, message="", loglevel="info", is_complete=True):
+                class _Line:
+                    pass
+                return _Line()
+            def section(self, command, loglevel="info"):
+                @contextlib.contextmanager
+                def _noop():
+                    class _Entry:
+                        def set_message(self, m): pass
+                        def set_loglevel(self, l): pass
+                    yield _Entry()
+                return _noop()
+
+        self.build_logger = _NoopBuildLogger()
+        self.signer = None
+
+    def set_build(self, build):
+        """Attach a Django Build record and switch to a real build logger.
+
+        Used by legacy code / tests that set ``adapter.build`` after construction.
+        """
+        from adapters.repo.django_build_logger import DjangoBuildLogger
+        self.build_logger = DjangoBuildLogger(build, self.repo_uid)
+
+    def __setattr__(self, name, value):
+        super().__setattr__(name, value)
+        # Auto-upgrade to a real build logger when a Build object is assigned
+        if name == "build" and value is not None and hasattr(value, "pk"):
+            self.set_build(value)
+
+    # ------------------------------------------------------------------
+    # Build-log helpers (delegate to the injected build_logger)
+    # ------------------------------------------------------------------
+
+    def _buildlog_write(self, command, message="", loglevel=BUILDLOG_INFO, is_complete=True):
+        return self.build_logger.write(command, message, loglevel, is_complete)
+
+    def _buildlog_section(self, command, loglevel=BUILDLOG_INFO):
+        return self.build_logger.section(command, loglevel)
+
+    # ------------------------------------------------------------------
+    # Package file management
+    # ------------------------------------------------------------------
 
     def _copy_packages(self, dest_dir, packages=None):
         """Symlink packages into *dest_dir*.
 
-        If *packages* is ``None``, ``self.packages`` is used (the full
-        package set for this repo).
+        If *packages* is ``None``, ``self.packages`` is used.
         """
         if packages is None:
             packages = self.packages
 
         with self._buildlog_section(f"Symlinking {len(packages)} packages") as log_entry:
             for package in packages:
-                src_sym = os.path.join(settings.STORAGE_PATH, package.relative_path())
+                # Support both PackageInfo (string attr) and Django Package model (method)
+                rel_path = package.relative_path
+                if callable(rel_path):
+                    rel_path = rel_path()
+                src_sym = os.path.join(self.config.storage_path, rel_path)
                 ext = os.path.splitext(package.filename)[1]
                 pool_name = f"{package.package_name}_{package.version}_{package.architecture}{ext}"
                 dst_sym = os.path.join(dest_dir, pool_name)
-                logger.debug(f"Symlinking {src_sym} to {dst_sym}")
+                logger.debug("Symlinking %s to %s", src_sym, dst_sym)
                 if not os.path.isfile(src_sym):
                     log_entry.set_message(f"Unable to find source package file {src_sym}")
                     continue
@@ -104,99 +195,58 @@ class BaseRepoAdapter:
 
                 os.symlink(src_sym, dst_sym)
 
-    def _buildlog_write(self, command, message="", loglevel=BUILDLOG_INFO, is_complete=True):
-        """
-        Write a message to the build log so that the status can be monitored
-        :param command: The CLI command, or the intention of the operatoin
-        :param message: The CLI response or outcome from the operation
-        :param loglevel: level of log message.  Controls filtering/coloring in web output
-        :return:
-        """
-
-        log_line = BuildLogLine()
-        log_line.build = self.build
-        log_line.command = command
-        log_line.message = message
-        log_line.loglevel = loglevel
-        log_line.line_number = self.log_number
-        log_line.exec_complete = is_complete
-        self.log_number += 1
-        log_line.save()
-
-        logger.info(f"build {self.repo_uid}: {loglevel} {command} {message}")
-
-        return log_line
-
-    def _buildlog_section(self, command, loglevel=BUILDLOG_INFO):
-        """
-        Meant to be run as a "with" statement to auto log start of sections
-        :param command: Section name
-        :param loglevel:
-        :return:
-        """
-        log_line = self._buildlog_write(command, loglevel=loglevel, is_complete=False)
-        return BuildLogEntry(command, log_line, self.repo_uid)
+    # ------------------------------------------------------------------
+    # Abstract methods — subclasses must implement
+    # ------------------------------------------------------------------
 
     def _generate_repo_structure(self, repo_path):
-        """
-        Implement this for each repo adapter.  The task should fully generate the repository metadata
-        to 'copy' files into the repo folders, call self._copy_packages()
-        :param repo_path: The path to the repo folder to generate the metadata
-        :return:
+        """Generate repository metadata into *repo_path*.
+
+        Must be implemented by each subclass.  Return ``True`` on success.
         """
         raise NotImplementedError("Subclasses must implement _generate_repo_structure()")
 
     def _get_repo_instructions(self):
-        """
-        Return a relevant address for the Repo.  Ideally this would be the full config option that can be copied/pasted
-        to configure the repo.
-        :return:
-        """
+        """Return user-facing instructions for configuring the repo."""
         raise NotImplementedError("Subclasses must implement _get_repo_instructions()")
 
-    def _clean_old_dirs(self, cur_repo_dir):
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
 
-        alldirs = os.listdir(settings.REPO_WWW_PATH)
+    def _clean_old_dirs(self, cur_repo_dir):
+        alldirs = os.listdir(self.config.repo_www_path)
         prefix = f"{self.repo_uid}."
         for d in alldirs:
             if d.startswith(prefix) and d != cur_repo_dir:
                 suffix = d[len(prefix):]
                 if suffix.isdigit():
-                    fullpath = os.path.join(settings.REPO_WWW_PATH, d)
-                    logger.debug(f"Removing old repo dir {fullpath}")
+                    fullpath = os.path.join(self.config.repo_www_path, d)
+                    logger.debug("Removing old repo dir %s", fullpath)
                     shutil.rmtree(fullpath)
 
     def _save_public_key(self, repo_path):
-
-        # Export the public key to the repo for convenience
+        """Export the public key to the repo for convenience."""
         with self._buildlog_section("Updating PGP keys"):
             pgp_output_path = os.path.join(repo_path, "public.gpg")
             with open(pgp_output_path, "w") as outf:
                 self._buildlog_write(f"Writing PGP key to {pgp_output_path}")
-                outf.write(self.pgp_key.public_key_pem)
-
-    # Subprocess timeout in seconds — prevents indefinite hangs from
-    # createrepo, apt-ftparchive, or gpg.
-    SUBPROCESS_TIMEOUT = 600
+                outf.write(self.signing_key.public_key_pem)
 
     def _execute_commands(self, commands, repo_path):
-        """
-        Execute a list of commands without invoking a shell.
+        """Execute a list of commands without invoking a shell.
 
         Each element of *commands* is a ``(args, output_file)`` tuple:
 
         * *args* — a list of strings (the program and its arguments).
         * *output_file* — ``None``, or a path **relative to repo_path**.
-          When set, the command's stdout is written to that file (replacing
-          the old ``> file`` shell redirection pattern).
 
         Returns ``True`` if every command succeeds, ``False`` on the first
         non-zero exit code.
         """
-
         working_dir = repo_path
         custom_env = os.environ.copy()
-        custom_env["GNUPGHOME"] = settings.KEYRING_PATH
+        custom_env["GNUPGHOME"] = self.config.keyring_path
 
         for args, output_file in commands:
             display_cmd = " ".join(args)
@@ -221,7 +271,6 @@ class BaseRepoAdapter:
                     return False
 
                 if output_file:
-                    # Write stdout to the target file (replaces shell ">").
                     output_path = os.path.join(repo_path, output_file)
                     with open(output_path, "w") as f:
                         f.write(proc_status.stdout)
@@ -235,76 +284,63 @@ class BaseRepoAdapter:
 
         return True
 
+    # ------------------------------------------------------------------
+    # Main entry point
+    # ------------------------------------------------------------------
+
     def setup_repo(self):
+        """Generate repo structure.  Returns ``True`` on success.
 
+        The caller (orchestrator) is responsible for creating the Build
+        record and updating the Repository model.
+        """
         # Ensure PGP key is prepped and ready
-        if self.pgp_key is not None:
-            self.gpg = PGPKeyring()
-            self.gpg.ensure_key(self.pgp_key)
-
-        self.packages = Package.objects.filter(repo__repo_uid=self.repo_uid)
-
-        # Atomically increment refresh_count and re-fetch to get the assigned value
-        Repository.objects.filter(repo_uid=self.repo_uid).update(refresh_count=F("refresh_count") + 1)
-        repo_db_obj = Repository.objects.get(repo_uid=self.repo_uid)
-
-        self.log_number = 0
-        self.build = Build()
-        self.build.repo = repo_db_obj
-        self.build.build_number = repo_db_obj.refresh_count
-        self.build.completion_status = Build.STATUS_RUNNING
-        self.build.save()
+        if self.signing_key is not None and self.signer is not None:
+            self.signer.ensure_key(self.signing_key)
 
         success = False
-        build_start_time = time.time()
         try:
-            # Format is repo_uid.refresh_count with 9 digits of 0 padding
-            dirname = f"{self.repo_uid}.{repo_db_obj.refresh_count:=09}"
-            dest_dir = os.path.join(settings.REPO_WWW_PATH, dirname)
+            # The orchestrator already incremented refresh_count; we need to
+            # compute the dirname from the repo_www_path listing.
+            existing = []
+            prefix = f"{self.repo_uid}."
+            if os.path.isdir(self.config.repo_www_path):
+                for d in os.listdir(self.config.repo_www_path):
+                    if d.startswith(prefix):
+                        suffix = d[len(prefix):]
+                        if suffix.isdigit():
+                            existing.append(int(suffix))
+            next_num = (max(existing) + 1) if existing else 1
+
+            dirname = f"{self.repo_uid}.{next_num:=09}"
+            dest_dir = os.path.join(self.config.repo_www_path, dirname)
 
             if os.path.exists(dest_dir):
                 with self._buildlog_section(f"Removing old directory path {dest_dir}"):
                     shutil.rmtree(dest_dir)
 
-            # Create directory path for repo
             os.makedirs(dest_dir)
 
             self._buildlog_write(f"Generating repo structure {dest_dir}")
             success = self._generate_repo_structure(dest_dir)
-            self._buildlog_write(f"Create repo complete {dest_dir}", success)
-
-            # In the case of a refresh, assuming this is refresh num 2 then we now have 3 directories:
-            # 1. the repo_uid.000001 directory
-            # 2. the repo_uid.000002 directory
-            # 3. the repo_uid directory symlinked to repo_uid.000001
-            #
-            # We need to update the symlink, and delete all old directories earlier than 00002
+            self._buildlog_write(f"Create repo complete {dest_dir}", str(success))
 
             if success:
-                self.build.completion_status = Build.STATUS_COMPLETE_SUCCESS
-                self.build.total_duration_sec = time.time() - build_start_time
-                self.build.save()
                 with self._buildlog_section(f"Updating repo symlink to point to {dirname}"):
-                    repo_uid_symlink = os.path.join(settings.REPO_WWW_PATH, self.repo_uid)
+                    repo_uid_symlink = os.path.join(self.config.repo_www_path, self.repo_uid)
                     if os.path.exists(repo_uid_symlink):
                         os.unlink(repo_uid_symlink)
-
                     os.symlink(dirname, repo_uid_symlink)
 
-                with self._buildlog_section(f"Cleaning old directories in {settings.REPO_WWW_PATH}"):
+                with self._buildlog_section(f"Cleaning old directories in {self.config.repo_www_path}"):
                     self._clean_old_dirs(dirname)
-            else:
-                self.build.completion_status = Build.STATUS_COMPLETE_ERROR
 
         except Exception as e:
-            self._buildlog_write(f"Exception processing repo {self.repo_uid}", e, loglevel=self.BUILDLOG_ERROR)
+            self._buildlog_write(
+                f"Exception processing repo {self.repo_uid}",
+                str(e),
+                loglevel=self.BUILDLOG_ERROR,
+            )
             success = False
-
-        if success:
-            self.build.completion_status = Build.STATUS_COMPLETE_SUCCESS
-        else:
-            self.build.completion_status = Build.STATUS_COMPLETE_ERROR
-        self.build.total_duration_sec = time.time() - build_start_time
-        self.build.save()
 
         return success

@@ -12,7 +12,31 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-# Load Celery when Django starts.
-from .celery import app as celery_app
 
-__all__ = ("celery_app",)
+import re
+
+from .base import RepoFileAdapter
+
+
+class GenericFileAdapter(RepoFileAdapter):
+    def __init__(self, filepath, original_filename=None):
+        super().__init__(filepath, original_filename)
+
+    def get_name(self):
+        return self.original_filename
+
+    def get_architecture(self):
+        return "any"
+
+    def get_version(self):
+        # Try finding the first "x.y.z" value from the filename to guess the version number
+        matches = re.findall(r"\d+\.\d+\.\d+", self.original_filename)
+        if len(matches) > 0:
+            return matches[0]
+        return ""
+
+    def get_description(self):
+        return ""
+
+    def get_builddate(self):
+        return None

@@ -15,15 +15,10 @@
 import logging
 import os
 
-from django.conf import settings
-
 from .base_repo import BaseRepoAdapter
 
 logger = logging.getLogger("openrepo_web")
 
-
-# Repo config looks like:
-# deb [arch=amd64 signed-by=/key.gpg2] http://172.17.0.1:9000/mytestrepo/amd64 stable main
 
 # Legacy single-architecture name used when multi_arch is disabled on the repo.
 DEB_ARCH_LEGACY = "any"
@@ -36,16 +31,7 @@ DEB_ARCH_DEFAULT = "amd64"
 class DebRepoAdapter(BaseRepoAdapter):
 
     def _get_architectures(self):
-        """
-        Return the list of distinct architectures present in the repo's package set.
-
-        In multi_arch mode: collect real architectures from packages (e.g. amd64, arm64).
-        In legacy mode: always return ["any"].
-
-        Falls back to [DEB_ARCH_DEFAULT] when no packages exist yet so that
-        an empty multi_arch repo still generates a valid (if empty) structure.
-        """
-        if not self.repo_db_obj.multi_arch:
+        if not self.multi_arch:
             return [DEB_ARCH_LEGACY]
 
         arches = sorted(set(
@@ -57,8 +43,7 @@ class DebRepoAdapter(BaseRepoAdapter):
     def _get_repo_instructions(self):
         dest_gpg_path = f"/usr/share/keyrings/openrepo-{self.repo_uid}.gpg"
 
-        if self.repo_db_obj.multi_arch:
-            # Collect real architectures; fall back to default when repo is empty.
+        if self.multi_arch:
             arches = sorted(set(
                 p.architecture for p in self.packages
                 if p.architecture and p.architecture != "all"
@@ -79,9 +64,7 @@ class DebRepoAdapter(BaseRepoAdapter):
 
     def _generate_repo_structure(self, repo_path):
 
-        # poolnames = ['main', 'contrib', 'non-free']
         poolnames = ["main"]
-
         architectures = self._get_architectures()
 
         # Create pool and per-architecture binary dirs
@@ -112,21 +95,15 @@ class DebRepoAdapter(BaseRepoAdapter):
         package_dest = os.path.join(repo_path, "pool/main/")
         self._copy_packages(package_dest)
 
-        # Each command is a (args_list, output_file_or_None) tuple.
-        # When output_file is set, stdout is written to that path (relative
-        # to repo_path) — replacing the old shell ">" redirection.
         exec_commands = []
 
-        # Check if we should use pure-Python fallback tools (OpenWrt only)
         use_python_tools = os.environ.get("OPENREPO_USE_PYTHON_TOOLS") == "1"
 
         if use_python_tools:
-            # Pure-Python fallback: generate Packages/Packages.gz without apt-ftparchive.
-            # This path is ONLY used on OpenWrt where apt-ftparchive is unavailable.
             from .fallback_tools import generate_packages_file
 
             pool_dir = os.path.join(repo_path, "pool")
-            if self.repo_db_obj.multi_arch and len(architectures) > 1:
+            if self.multi_arch and len(architectures) > 1:
                 for arch in architectures:
                     output_dir = os.path.join(repo_path, f"dists/stable/main/binary-{arch}")
                     generate_packages_file(pool_dir, output_dir, arch=arch)
@@ -136,16 +113,13 @@ class DebRepoAdapter(BaseRepoAdapter):
                     output_dir = os.path.join(repo_path, f"dists/stable/{poolname}/binary-{arch}")
                     generate_packages_file(pool_dir, output_dir, arch=None)
         else:
-            # Standard path: use apt-ftparchive (Docker, DEB, RPM, Arch, bare-metal)
             aptftp_base = [
                 "apt-ftparchive",
-                "--db", settings.DEB_DB_PATH,
+                "--db", self.config.deb_db_path,
                 "-o", "APT::FTPArchive::AlwaysStat=true",
             ]
 
-            if self.repo_db_obj.multi_arch and len(architectures) > 1:
-                # Per-architecture Packages index.
-                # arch=all packages must appear in every arch's index (Debian policy).
+            if self.multi_arch and len(architectures) > 1:
                 for arch in architectures:
                     exec_commands.append((
                         aptftp_base + ["packages", "--arch", arch, "pool/"],
@@ -156,7 +130,6 @@ class DebRepoAdapter(BaseRepoAdapter):
                         None,
                     ))
             else:
-                # Legacy single-arch (or only one real arch present)
                 arch = architectures[0]
                 for poolname in poolnames:
                     exec_commands.append((
@@ -171,7 +144,7 @@ class DebRepoAdapter(BaseRepoAdapter):
         # Contents files (per-arch)
         aptftp_base_contents = [
             "apt-ftparchive",
-            "--db", settings.DEB_DB_PATH,
+            "--db", self.config.deb_db_path,
             "-o", "APT::FTPArchive::AlwaysStat=true",
         ]
         for poolname in poolnames:
@@ -196,7 +169,7 @@ class DebRepoAdapter(BaseRepoAdapter):
                     f"dists/stable/{poolname}/binary-{arch}/Release",
                 ))
 
-        # Top-level Release file (lists all architectures via release.conf)
+        # Top-level Release file
         exec_commands.append((
             aptftp_base_contents + [
                 "release", "-c", "release.conf", "dists/stable",
@@ -204,7 +177,7 @@ class DebRepoAdapter(BaseRepoAdapter):
             "dists/stable/Release",
         ))
 
-        if self.pgp_key is None:
+        if self.signing_key is None:
             self._buildlog_write(
                 "Missing PGP Key",
                 "PGP key not configured for this repo.  Signing disabled",
@@ -215,7 +188,7 @@ class DebRepoAdapter(BaseRepoAdapter):
                 [
                     "gpg", "-a", "--yes",
                     "--output", "dists/stable/Release.gpg",
-                    "--local-user", self.pgp_key.fingerprint,
+                    "--local-user", self.signing_key.fingerprint,
                     "--detach-sign", "dists/stable/Release",
                 ],
                 None,
@@ -224,7 +197,7 @@ class DebRepoAdapter(BaseRepoAdapter):
                 [
                     "gpg", "-a", "--yes", "--clearsign",
                     "--output", "dists/stable/InRelease",
-                    "--local-user", self.pgp_key.fingerprint,
+                    "--local-user", self.signing_key.fingerprint,
                     "--detach-sign", "dists/stable/Release",
                 ],
                 None,

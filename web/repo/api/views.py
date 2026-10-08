@@ -16,7 +16,6 @@ import hashlib
 import logging
 import os
 import re
-import threading
 
 import rest_framework.exceptions
 from django.conf import settings
@@ -56,7 +55,6 @@ from .serializers import (
     UserSerializer,
 )
 from .retention import apply_retention_policy
-from .upload_processor import process_upload
 from .util import MultipleFieldLookupMixin
 
 logger = logging.getLogger("openrepo_web")
@@ -397,8 +395,8 @@ class UploadViewSet(viewsets.ViewSet):
             sha512=sha512,
         )
 
-        thread = threading.Thread(target=process_upload, args=(task.pk,))
-        thread.start()
+        from repo.tasks import process_upload_task
+        process_upload_task.delay(str(task.pk))
 
         return Response({"task_id": str(task.pk)}, status=rest_framework.status.HTTP_202_ACCEPTED)
 

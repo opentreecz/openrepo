@@ -18,8 +18,6 @@ import logging
 import os
 import subprocess
 
-from django.conf import settings
-
 from .base_repo import BaseRepoAdapter
 
 logger = logging.getLogger("openrepo_web")
@@ -41,7 +39,7 @@ class GenericRepoAdapter(BaseRepoAdapter):
         self._generate_html_index(repo_path)
 
         # PGP signing (if a signing key is configured)
-        if self.pgp_key is not None:
+        if self.signing_key is not None:
             self._sign_index(repo_path)
             self._save_public_key(repo_path)
 
@@ -54,7 +52,6 @@ class GenericRepoAdapter(BaseRepoAdapter):
             for entry in os.scandir(repo_path):
                 if not entry.is_file(follow_symlinks=True):
                     continue
-                # Skip metadata files we generate ourselves
                 if entry.name.endswith(".md5") or entry.name in ("index.html", "index.html.asc", "public.gpg"):
                     continue
                 md5 = _file_md5(entry.path)
@@ -67,8 +64,17 @@ class GenericRepoAdapter(BaseRepoAdapter):
     def _generate_html_index(self, repo_path):
         """Generate a single-page HTML index listing all packages with metadata."""
         rows = []
-        for pkg in self.packages.order_by("package_name", "-upload_date"):
-            src_path = os.path.join(settings.STORAGE_PATH, pkg.relative_path())
+        # Sort packages by name then by upload_date desc
+        sorted_pkgs = sorted(
+            self.packages,
+            key=lambda p: (p.package_name, -(p.upload_date or "") if isinstance(p.upload_date, str) else ""),
+        )
+        for pkg in sorted_pkgs:
+            # Support both PackageInfo (string attr) and Django Package model (method)
+            rel_path = pkg.relative_path
+            if callable(rel_path):
+                rel_path = rel_path()
+            src_path = os.path.join(self.config.storage_path, rel_path)
             try:
                 size = os.path.getsize(src_path)
             except OSError:
@@ -77,6 +83,16 @@ class GenericRepoAdapter(BaseRepoAdapter):
             ext = os.path.splitext(pkg.filename)[1]
             pool_name = f"{pkg.package_name}_{pkg.version}_{pkg.architecture}{ext}"
 
+            upload_date_str = ""
+            if pkg.upload_date:
+                ud = pkg.upload_date
+                if isinstance(ud, str):
+                    # ISO string from PackageInfo
+                    upload_date_str = ud[:16].replace("T", " ")
+                else:
+                    # datetime from Django model (legacy compat)
+                    upload_date_str = ud.strftime("%Y-%m-%d %H:%M")
+
             rows.append(
                 _html_row(
                     filename=pool_name,
@@ -84,7 +100,7 @@ class GenericRepoAdapter(BaseRepoAdapter):
                     version=pkg.version,
                     architecture=pkg.architecture,
                     size=size,
-                    upload_date=pkg.upload_date.strftime("%Y-%m-%d %H:%M") if pkg.upload_date else "",
+                    upload_date=upload_date_str,
                     sha512=pkg.checksum_sha512 or "",
                 )
             )
@@ -105,7 +121,7 @@ class GenericRepoAdapter(BaseRepoAdapter):
             return
 
         custom_env = os.environ.copy()
-        custom_env["GNUPGHOME"] = settings.KEYRING_PATH
+        custom_env["GNUPGHOME"] = self.config.keyring_path
 
         with self._buildlog_section("Signing index.html") as log_entry:
             try:
@@ -116,7 +132,7 @@ class GenericRepoAdapter(BaseRepoAdapter):
                         "--yes",
                         "--armor",
                         "--detach-sign",
-                        "--default-key", self.pgp_key.fingerprint,
+                        "--default-key", self.signing_key.fingerprint,
                         "--output", sig_path,
                         index_path,
                     ],
@@ -144,7 +160,6 @@ class GenericRepoAdapter(BaseRepoAdapter):
 # ---------------------------------------------------------------------------
 
 def _file_md5(filepath):
-    """Compute the MD5 hex digest of a file, following symlinks."""
     h = hashlib.md5()
     with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(8192), b""):
@@ -153,12 +168,10 @@ def _file_md5(filepath):
 
 
 def _esc(text):
-    """HTML-escape a string."""
     return html.escape(str(text))
 
 
 def _human_size(nbytes):
-    """Format a byte count as a human-readable string."""
     for unit in ("B", "KB", "MB", "GB", "TB"):
         if abs(nbytes) < 1024:
             return f"{nbytes:.1f} {unit}" if unit != "B" else f"{nbytes} {unit}"
@@ -167,7 +180,6 @@ def _human_size(nbytes):
 
 
 def _html_row(filename, package_name, version, architecture, size, upload_date, sha512):
-    """Render a single table row."""
     return (
         f"<tr>"
         f'<td><a href="{_esc(filename)}">{_esc(filename)}</a></td>'
@@ -182,7 +194,6 @@ def _html_row(filename, package_name, version, architecture, size, upload_date, 
 
 
 def _html_page(repo_uid, rows):
-    """Render the full HTML index page."""
     rows_html = "\n".join(rows) if rows else '<tr><td colspan="7">No packages</td></tr>'
     return f"""<!DOCTYPE html>
 <html lang="en">

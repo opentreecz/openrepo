@@ -57,6 +57,27 @@ def flag_repo_as_stale(sender, instance, using, **kwargs):
     repo.last_updated = datetime.datetime.now(tz=datetime.timezone.utc)
     repo.save()
 
+    # Dispatch a Celery task to rebuild the repo.  The 2-second countdown
+    # naturally batches rapid successive saves (e.g. 20 packages uploaded
+    # in quick succession only triggers one rebuild).  Deduplication by
+    # task_id prevents concurrent rebuilds of the same repo.
+    #
+    # In eager mode (tests), we skip the dispatch — the is_stale flag is
+    # sufficient and the test can call build_repo() explicitly if needed.
+    try:
+        from django.conf import settings as _settings
+        if not getattr(_settings, "CELERY_TASK_ALWAYS_EAGER", False):
+            from repo.tasks import rebuild_repo_task
+            rebuild_repo_task.apply_async(
+                args=[repo.repo_uid],
+                task_id=f"rebuild-{repo.repo_uid}",
+                countdown=2,
+            )
+    except Exception:
+        # If Celery/Redis is unavailable, the periodic check_stale_repos
+        # task will pick up the is_stale flag as a fallback.
+        logger.debug("Could not dispatch rebuild task for %s (Celery unavailable?)", repo.repo_uid)
+
 
 @receiver(signals.post_save, sender=User)
 def create_auth_token(sender, instance, **kwargs):

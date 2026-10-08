@@ -137,82 +137,32 @@ class RunWorkerCommandTestCase(TestCase):
     """Test the runworker management command."""
 
     def test_command_invalid_thread_count_too_low(self):
-        """runworker rejects 0 threads"""
+        """runworker rejects 0 concurrency"""
         from django.core.management import call_command
 
         out = StringIO()
         call_command("runworker", num_threads=0, stdout=out)
-        self.assertIn("Invalid number of threads", out.getvalue())
+        self.assertIn("Invalid concurrency", out.getvalue())
 
     def test_command_invalid_thread_count_too_high(self):
-        """runworker rejects > 100 threads"""
+        """runworker rejects > 100 concurrency"""
         from django.core.management import call_command
 
         out = StringIO()
         call_command("runworker", num_threads=101, stdout=out)
-        self.assertIn("Invalid number of threads", out.getvalue())
+        self.assertIn("Invalid concurrency", out.getvalue())
 
-    @patch("repo.management.commands.runworker.BackgroundWorker")
-    @patch("repo.management.commands.runworker.time.sleep", side_effect=KeyboardInterrupt)
-    def test_command_starts_workers_and_exits_cleanly(self, mock_sleep, mock_worker_cls):
-        """runworker starts N worker threads and exits on KeyboardInterrupt"""
+    @patch("repo.management.commands.runworker.subprocess.run")
+    def test_command_starts_celery_worker(self, mock_run):
+        """runworker starts a Celery worker process"""
         from django.core.management import call_command
-
-        mock_worker = MagicMock()
-        mock_worker_cls.return_value = mock_worker
 
         out = StringIO()
         call_command("runworker", num_threads=2, stdout=out)
 
-        self.assertEqual(mock_worker_cls.call_count, 2)
-        self.assertEqual(mock_worker.start.call_count, 2)
-        self.assertEqual(mock_worker.stop.call_count, 2)
-        self.assertEqual(mock_worker.join.call_count, 2)
-        self.assertIn("Worker exited", out.getvalue())
-
-    @patch("repo.management.commands.runworker.BackgroundWorker")
-    @patch("repo.management.commands.runworker.time.sleep", side_effect=[None, KeyboardInterrupt])
-    def test_command_queues_stale_repos_each_loop(self, mock_sleep, mock_worker_cls):
-        """runworker scans for stale repos and queues them for cleaning each iteration"""
-        from django.core.management import call_command
-
-        from repo.models import PGPSigningKey, Repository
-
-        signing_key = PGPSigningKey.objects.create(
-            name="Worker Key",
-            email="worker@example.com",
-            fingerprint="RUNWORKER_FP_1",
-            public_key_pem="pub",
-            private_key_pem="priv",
-        )
-        stale_repo = Repository.objects.create(
-            repo_uid="runworker-stale-repo", repo_type="deb", signing_key=signing_key, is_stale=True
-        )
-
-        mock_worker = MagicMock()
-        mock_worker_cls.return_value = mock_worker
-
-        with patch("repo.management.commands.runworker.ChoreList") as mock_chore_list_cls:
-            mock_chores = MagicMock()
-            mock_chore_list_cls.return_value = mock_chores
-
-            out = StringIO()
-            call_command("runworker", num_threads=1, stdout=out)
-
-            mock_chores.set_needs_clean.assert_called_once_with(stale_repo.repo_uid)
-        self.assertIn("Worker exited", out.getvalue())
-
-    @patch("repo.management.commands.runworker.BackgroundWorker")
-    @patch("repo.management.commands.runworker.Repository.objects.filter", side_effect=RuntimeError("db blip"))
-    @patch("repo.management.commands.runworker.time.sleep", side_effect=[None, KeyboardInterrupt])
-    def test_command_survives_unexpected_exception_in_loop(self, mock_sleep, mock_filter, mock_worker_cls):
-        """runworker logs and continues (rather than crashing) on an unexpected error in the loop"""
-        from django.core.management import call_command
-
-        mock_worker = MagicMock()
-        mock_worker_cls.return_value = mock_worker
-
-        out = StringIO()
-        call_command("runworker", num_threads=1, stdout=out)
-
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        self.assertIn("celery", args)
+        self.assertIn("worker", args)
+        self.assertIn("--concurrency=2", args)
         self.assertIn("Worker exited", out.getvalue())

@@ -322,3 +322,35 @@ MAX_UPLOAD_SIZE = int(os.getenv("OPENREPO_MAX_UPLOAD_SIZE", str(2 * 1024 ** 3)))
 
 # In case a repo creation gets frozen in bg worker, this will allow it to reattempt
 REPO_CREATE_TIMEOUT_SEC = 60 * 60 * 2
+
+# ---------------------------------------------------------------------------
+# Celery configuration
+# ---------------------------------------------------------------------------
+CELERY_BROKER_URL = os.getenv("OPENREPO_REDIS_URL", "redis://redis:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("OPENREPO_REDIS_URL", "redis://redis:6379/0")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "UTC"
+CELERY_TASK_ACKS_LATE = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+
+# Make Celery tasks execute synchronously during tests.
+# Auto-detect test mode: Django sets up an in-memory DB or the test runner
+# passes 'test' as the first management command argument.
+import sys
+_is_testing = "test" in sys.argv or os.getenv("OPENREPO_CELERY_EAGER", "0") == "1"
+CELERY_TASK_ALWAYS_EAGER = _is_testing
+CELERY_TASK_EAGER_PROPAGATES = _is_testing
+
+# Periodic tasks (Celery Beat)
+CELERY_BEAT_SCHEDULE = {
+    "retention-sweep": {
+        "task": "repo.tasks.retention_sweep",
+        "schedule": 86400.0,  # 24 hours
+    },
+    "check-stale-repos": {
+        "task": "repo.tasks.check_stale_repos",
+        "schedule": 5.0,  # every 5 seconds
+    },
+}

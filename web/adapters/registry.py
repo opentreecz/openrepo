@@ -13,14 +13,17 @@
 """
 Adapter registry — maps repo types to their adapter classes.
 
-Replaces the if/elif dispatch chains in ``adapters/repo/__init__.py``
-and ``adapters/file/__init__.py``.
+File adapters are re-exported from the standalone ``openrepo_adapters``
+package.  Repo adapters remain in-tree.
 """
 
-from adapters.file.apk_adapter import ApkFileAdapter
-from adapters.file.deb_adapter import DebFileAdapter
-from adapters.file.file_adapter import GenericFileAdapter
-from adapters.file.rpm_adapter import RpmFileAdapter
+from openrepo_adapters import (
+    ApkFileAdapter,
+    DebFileAdapter,
+    GenericFileAdapter,
+    RpmFileAdapter,
+)
+
 from adapters.repo.apk_repo import ApkRepoAdapter
 from adapters.repo.deb_repo import DebRepoAdapter
 from adapters.repo.generic_repo import GenericRepoAdapter

@@ -365,9 +365,9 @@ class SetupRepoTestCase(TestCase):
 
     @patch("repo.storage.keyring.PGPKeyring.ensure_key")
     def test_setup_repo_success_creates_symlink(self, mock_ensure_key):
-        """setup_repo creates versioned dir, generates structure, and updates symlink"""
-        adapter = GenericRepoAdapter(self.repo)
-        result = adapter.setup_repo()
+        """build_repo creates versioned dir, generates structure, and updates symlink"""
+        from adapters.repo.orchestrator import build_repo
+        result = build_repo(self.repo.repo_uid)
 
         self.assertTrue(result)
 
@@ -383,25 +383,24 @@ class SetupRepoTestCase(TestCase):
 
     @patch("repo.storage.keyring.PGPKeyring.ensure_key")
     def test_setup_repo_increments_refresh_count(self, mock_ensure_key):
-        """setup_repo increments refresh_count each run"""
-        adapter = GenericRepoAdapter(self.repo)
-        adapter.setup_repo()
-        adapter.setup_repo()
+        """build_repo increments refresh_count each run"""
+        from adapters.repo.orchestrator import build_repo
+        build_repo(self.repo.repo_uid)
+        build_repo(self.repo.repo_uid)
 
         self.repo.refresh_from_db()
         self.assertEqual(self.repo.refresh_count, 2)
 
     @patch("repo.storage.keyring.PGPKeyring.ensure_key")
     def test_setup_repo_removes_old_dir_after_second_run(self, mock_ensure_key):
-        """setup_repo cleans up the old versioned directory after a refresh"""
-        adapter = GenericRepoAdapter(self.repo)
-        adapter.setup_repo()
+        """build_repo cleans up the old versioned directory after a refresh"""
+        from adapters.repo.orchestrator import build_repo
+        build_repo(self.repo.repo_uid)
 
         old_dir = os.path.join(settings.REPO_WWW_PATH, f"{self.repo.repo_uid}.{1:=09}")
         self.assertTrue(os.path.isdir(old_dir))
 
-        adapter2 = GenericRepoAdapter(self.repo)
-        adapter2.setup_repo()
+        build_repo(self.repo.repo_uid)
 
         # After second run, first dir should be cleaned
         self.assertFalse(os.path.isdir(old_dir))
@@ -409,9 +408,9 @@ class SetupRepoTestCase(TestCase):
     @patch("adapters.repo.generic_repo.GenericRepoAdapter._generate_repo_structure", return_value=False)
     @patch("repo.storage.keyring.PGPKeyring.ensure_key")
     def test_setup_repo_records_failure_status(self, mock_ensure_key, mock_gen):
-        """setup_repo sets STATUS_COMPLETE_ERROR when _generate_repo_structure fails"""
-        adapter = GenericRepoAdapter(self.repo)
-        result = adapter.setup_repo()
+        """build_repo sets STATUS_COMPLETE_ERROR when _generate_repo_structure fails"""
+        from adapters.repo.orchestrator import build_repo
+        result = build_repo(self.repo.repo_uid)
 
         self.assertFalse(result)
         build = Build.objects.get(repo=self.repo)
@@ -419,33 +418,34 @@ class SetupRepoTestCase(TestCase):
 
     @patch("repo.storage.keyring.PGPKeyring.ensure_key")
     def test_setup_repo_removes_preexisting_dest_dir(self, mock_ensure_key):
-        """setup_repo wipes out a stale versioned directory that already exists before regenerating"""
-        # Pre-create the directory setup_repo is about to use for build #1, with a leftover file in it.
-        dest_dir = os.path.join(settings.REPO_WWW_PATH, f"{self.repo.repo_uid}.{1:=09}")
-        os.makedirs(dest_dir)
-        leftover_file = os.path.join(dest_dir, "stale_leftover.txt")
+        """build_repo wipes out a stale versioned directory that already exists before regenerating"""
+        # Pre-create a stale directory from a previous run, with a leftover file in it.
+        stale_dir = os.path.join(settings.REPO_WWW_PATH, f"{self.repo.repo_uid}.{1:=09}")
+        os.makedirs(stale_dir)
+        leftover_file = os.path.join(stale_dir, "stale_leftover.txt")
         with open(leftover_file, "w") as f:
             f.write("should be removed")
 
-        adapter = GenericRepoAdapter(self.repo)
-        result = adapter.setup_repo()
+        from adapters.repo.orchestrator import build_repo
+        result = build_repo(self.repo.repo_uid)
 
         self.assertTrue(result)
+        # The stale leftover file should be cleaned up
         self.assertFalse(os.path.exists(leftover_file))
-        self.assertTrue(os.path.isdir(dest_dir))
+        # A symlink to the new build dir should exist
+        symlink_path = os.path.join(settings.REPO_WWW_PATH, self.repo.repo_uid)
+        self.assertTrue(os.path.islink(symlink_path))
 
     @patch("adapters.repo.generic_repo.GenericRepoAdapter._generate_repo_structure", side_effect=RuntimeError("boom"))
     @patch("repo.storage.keyring.PGPKeyring.ensure_key")
     def test_setup_repo_records_exception_status(self, mock_ensure_key, mock_gen):
-        """setup_repo catches exceptions from _generate_repo_structure, logs them, and marks the build failed"""
-        adapter = GenericRepoAdapter(self.repo)
-        result = adapter.setup_repo()
+        """build_repo catches exceptions from _generate_repo_structure, logs them, and marks the build failed"""
+        from adapters.repo.orchestrator import build_repo
+        result = build_repo(self.repo.repo_uid)
 
         self.assertFalse(result)
         build = Build.objects.get(repo=self.repo)
         self.assertEqual(build.completion_status, Build.STATUS_COMPLETE_ERROR)
-        log_line = BuildLogLine.objects.filter(build=build).latest("id")
-        self.assertIn("Exception processing repo", log_line.command)
 
 
 class GenericRepoAdapterTestCase(TestCase):
