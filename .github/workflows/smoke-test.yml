@@ -30,7 +30,7 @@ jobs:
             healthy=$(docker compose ps --format json | jq -r '.Health // "unknown"' | grep -c "healthy" || true)
             total=$(docker compose ps --format json | jq -r '.Health // "unknown"' | wc -l)
             echo "Healthy: $healthy / $total (elapsed: ${elapsed}s)"
-            if [ "$healthy" -ge 3 ]; then
+            if [ "$healthy" -ge 5 ]; then
               echo "All services healthy!"
               break
             fi
@@ -169,7 +169,7 @@ jobs:
       - name: Poll upload status
         run: |
           TASK_ID="${{ steps.upload.outputs.task_id }}"
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             response=$(curl -sf \
               -H "Authorization: Token ${{ steps.auth.outputs.token }}" \
               http://localhost:7376/api/upload-status/$TASK_ID/)
@@ -202,13 +202,13 @@ jobs:
 
       - name: Verify worker is running
         run: |
-          WORKER_PID=$(docker compose exec -T worker pgrep -f "manage.py runworker" || true)
+          WORKER_PID=$(docker compose exec -T worker pgrep -f "celery" || true)
           if [ -z "$WORKER_PID" ]; then
-            echo "::error::Background worker process not found"
+            echo "::error::Celery worker process not found"
             docker compose logs worker
             exit 1
           fi
-          echo "Worker is running (PID: $WORKER_PID)"
+          echo "Celery worker is running (PID: $WORKER_PID)"
 
       - name: Test signing key listing
         run: |
