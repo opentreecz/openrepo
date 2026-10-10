@@ -3,6 +3,7 @@ import datetime
 import os
 import tempfile
 import threading
+import uuid
 from unittest.mock import patch
 
 from django.conf import settings
@@ -552,3 +553,319 @@ class PGPKeyApiTestCase(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertIn("Unable to delete", response.data["detail"])
+
+
+class UploadStatusAuthorizationTestCase(APITestCase):
+    """Test upload-status authorization for non-superusers."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="authz_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+
+        self.regular_user = User.objects.create_user(username="authz_regular", password="password123")
+        self.regular_token = Token.objects.get(user=self.regular_user).key
+
+        self.signing_key = PGPSigningKey.objects.create(
+            name="AuthzKey", email="authz@example.com",
+            fingerprint="AUTHZ_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        )
+        self.repo = Repository.objects.create(
+            repo_uid="authz-repo", repo_type="files", signing_key=self.signing_key,
+        )
+        self.task = UploadTask.objects.create(
+            repo=self.repo, status="completed", filename="test.deb",
+            filesize=100, stored_path="/tmp/fake",
+        )
+
+    def test_superuser_can_see_any_upload_status(self):
+        """Superuser can poll any upload task."""
+        response = self.client.get(
+            f"/api/upload-status/{self.task.pk}/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_user_without_write_access_gets_404(self):
+        """Non-superuser without write access gets 404 (not 403, to avoid leaking task existence)."""
+        response = self.client.get(
+            f"/api/upload-status/{self.task.pk}/",
+            HTTP_AUTHORIZATION=f"Token {self.regular_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_user_with_write_access_can_see_upload_status(self):
+        """Non-superuser with write access to the repo can poll the task."""
+        self.repo.write_access.add(self.regular_user)
+        response = self.client.get(
+            f"/api/upload-status/{self.task.pk}/",
+            HTTP_AUTHORIZATION=f"Token {self.regular_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_nonexistent_task_returns_404(self):
+        """Polling a non-existent task ID returns 404."""
+        response = self.client.get(
+            f"/api/upload-status/{uuid.uuid4()}/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class MaxUploadSizeTestCase(APITestCase):
+    """Test that MAX_UPLOAD_SIZE is enforced."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="size_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+
+        self.test_dir = tempfile.mkdtemp()
+        settings.STORAGE_PATH = self.test_dir
+
+        self.signing_key = PGPSigningKey.objects.create(
+            name="SizeKey", email="size@example.com",
+            fingerprint="SIZE_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        )
+        self.repo = Repository.objects.create(
+            repo_uid="size-repo", repo_type="files", signing_key=self.signing_key,
+        )
+
+    def test_oversized_upload_rejected(self):
+        """Uploading a file exceeding MAX_UPLOAD_SIZE returns 400."""
+        original_max = settings.MAX_UPLOAD_SIZE
+        settings.MAX_UPLOAD_SIZE = 10  # 10 bytes
+        try:
+            upload_file = SimpleUploadedFile(
+                "big.deb", b"x" * 100, content_type="application/octet-stream",
+            )
+            response = self.client.post(
+                f"/api/{self.repo.repo_uid}/upload/",
+                data={"package_file": upload_file},
+                format="multipart",
+                HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+            )
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        finally:
+            settings.MAX_UPLOAD_SIZE = original_max
+
+
+class VersionHeaderMiddlewareTestCase(APITestCase):
+    """Test that the X-OpenRepo-Version header is present on API responses."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="ver_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+
+    def test_api_response_has_version_header(self):
+        """All API responses include X-OpenRepo-Version header."""
+        response = self.client.get("/api/health/")
+        self.assertIn("X-OpenRepo-Version", response)
+
+    def test_version_header_on_authenticated_endpoint(self):
+        """Authenticated endpoints also include the version header."""
+        response = self.client.get("/api/repos/", HTTP_AUTHORIZATION=f"Token {self.admin_token}")
+        self.assertIn("X-OpenRepo-Version", response)
+
+
+class V1PrefixRoutingTestCase(APITestCase):
+    """Test that /api/v1/ prefix works as an alias for /api/."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="v1_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+
+    def test_v1_repos_returns_same_as_api_repos(self):
+        """GET /api/v1/repos/ returns the same data as GET /api/repos/."""
+        resp_api = self.client.get("/api/repos/", HTTP_AUTHORIZATION=f"Token {self.admin_token}")
+        resp_v1 = self.client.get("/api/v1/repos/", HTTP_AUTHORIZATION=f"Token {self.admin_token}")
+        self.assertEqual(resp_api.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp_v1.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp_api.data["count"], resp_v1.data["count"])
+
+    def test_v1_health_endpoint(self):
+        """GET /api/v1/health/ works."""
+        response = self.client.get("/api/v1/health/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["status"], "ok")
+
+
+class PackagesSearchFilterTestCase(APITestCase):
+    """Test package search and filter functionality."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="search_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+
+        self.signing_key = PGPSigningKey.objects.create(
+            name="SearchKey", email="search@example.com",
+            fingerprint="SEARCH_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        )
+        self.repo = Repository.objects.create(
+            repo_uid="search-repo", repo_type="deb", signing_key=self.signing_key,
+        )
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        Package.objects.create(
+            repo=self.repo, package_uid="pkg-nginx-amd64",
+            filename="nginx_1.0_amd64.deb", package_name="nginx",
+            version="1.0", architecture="amd64",
+            upload_date=now, checksum_sha512="hash1",
+        )
+        Package.objects.create(
+            repo=self.repo, package_uid="pkg-nginx-arm64",
+            filename="nginx_1.0_arm64.deb", package_name="nginx",
+            version="1.0", architecture="arm64",
+            upload_date=now, checksum_sha512="hash2",
+        )
+        Package.objects.create(
+            repo=self.repo, package_uid="pkg-curl-amd64",
+            filename="curl_2.0_amd64.deb", package_name="curl",
+            version="2.0", architecture="amd64",
+            upload_date=now, checksum_sha512="hash3",
+        )
+
+    def test_search_by_package_name(self):
+        """?search=nginx returns only nginx packages."""
+        response = self.client.get(
+            f"/api/{self.repo.repo_uid}/packages/?search=nginx",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+
+    def test_filter_by_architecture(self):
+        """?architecture=amd64 returns only amd64 packages."""
+        response = self.client.get(
+            f"/api/{self.repo.repo_uid}/packages/?architecture=amd64",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 2)
+        for pkg in response.data["results"]:
+            self.assertEqual(pkg["architecture"], "amd64")
+
+    def test_filter_by_package_name_exact(self):
+        """?package_name=curl returns only curl packages."""
+        response = self.client.get(
+            f"/api/{self.repo.repo_uid}/packages/?package_name=curl",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["package_name"], "curl")
+
+    def test_combined_filter_and_search(self):
+        """?package_name=nginx&architecture=arm64 narrows to one result."""
+        response = self.client.get(
+            f"/api/{self.repo.repo_uid}/packages/?package_name=nginx&architecture=arm64",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["architecture"], "arm64")
+
+
+class RepoFilteringTestCase(APITestCase):
+    """Test repository filtering and search."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="rf_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+
+        self.signing_key = PGPSigningKey.objects.create(
+            name="RFKey", email="rf@example.com",
+            fingerprint="RF_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        )
+        Repository.objects.create(repo_uid="rf-deb", repo_type="deb", signing_key=self.signing_key)
+        Repository.objects.create(repo_uid="rf-rpm", repo_type="rpm", signing_key=self.signing_key)
+        Repository.objects.create(repo_uid="rf-files", repo_type="files", signing_key=self.signing_key)
+
+    def test_filter_repos_by_type(self):
+        """?repo_type=deb returns only deb repos."""
+        response = self.client.get(
+            "/api/repos/?repo_type=deb",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(all(r["repo_type"] == "deb" for r in response.data["results"]))
+
+    def test_search_repos_by_uid(self):
+        """?search=rpm returns repos with 'rpm' in the UID."""
+        response = self.client.get(
+            "/api/repos/?search=rpm",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(all("rpm" in r["repo_uid"] for r in response.data["results"]))
+
+
+class PatchSupportTestCase(APITestCase):
+    """Test PATCH (partial update) support on repos and packages."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="patch_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+
+        self.signing_key = PGPSigningKey.objects.create(
+            name="PatchKey", email="patch@example.com",
+            fingerprint="PATCH_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        )
+        self.repo = Repository.objects.create(
+            repo_uid="patch-repo", repo_type="deb", signing_key=self.signing_key,
+        )
+
+    def test_patch_repo_multi_arch(self):
+        """PATCH /api/<repo_uid>/ can toggle multi_arch without sending all fields."""
+        response = self.client.patch(
+            f"/api/{self.repo.repo_uid}/",
+            data={"multi_arch": False},
+            format="json",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.repo.refresh_from_db()
+        self.assertFalse(self.repo.multi_arch)
+
+
+class UploadTaskSerializerFieldsTestCase(APITestCase):
+    """Test that UploadTaskSerializer includes repo_uid and sha512."""
+
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser(username="field_admin", password="password123")
+        self.admin_token = Token.objects.get(user=self.admin).key
+
+        self.signing_key = PGPSigningKey.objects.create(
+            name="FieldKey", email="field@example.com",
+            fingerprint="FIELD_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        )
+        self.repo = Repository.objects.create(
+            repo_uid="field-repo", repo_type="files", signing_key=self.signing_key,
+        )
+        self.task = UploadTask.objects.create(
+            repo=self.repo, status="completed", filename="test.deb",
+            filesize=100, stored_path="/tmp/fake", sha512="abc123hash",
+        )
+
+    def test_upload_status_includes_repo_uid(self):
+        """Upload status response includes repo_uid field."""
+        response = self.client.get(
+            f"/api/upload-status/{self.task.pk}/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["repo_uid"], "field-repo")
+
+    def test_upload_status_includes_sha512(self):
+        """Upload status response includes sha512 field."""
+        response = self.client.get(
+            f"/api/upload-status/{self.task.pk}/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["sha512"], "abc123hash")

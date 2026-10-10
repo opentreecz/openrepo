@@ -33,14 +33,14 @@ urlpatterns = [
     path(r"upload-status/<uuid:task_id>/", views.UploadStatusView.as_view({"get": "retrieve"}), name="upload-status"),
     path(
         r"<slug:repo_uid>/",
-        views.RepoViewSet.as_view({"get": "retrieve", "put": "update", "delete": "destroy"}),
+        views.RepoViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}),
         name="repo-detail",
     ),
     path(r"<slug:repo_uid>/packages/", views.PackagesViewSet.as_view({"get": "list"}), name="package-list"),
     path(r"<slug:repo_uid>/upload/", views.UploadViewSet.as_view({"post": "create"}), name="upload"),
     path(
         r"<slug:repo_uid>/pkg/<slug:package_uid>/",
-        views.PackageViewSet.as_view({"get": "retrieve", "put": "update", "delete": "destroy"}),
+        views.PackageViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}),
         name="package-detail",
     ),
     path(

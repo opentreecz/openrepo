@@ -19,11 +19,26 @@ from repo.models import Build, BuildLogLine
 
 
 class BuildFilter(df_filters.FilterSet):
-    min_build = df_filters.NumberFilter(field_name="build_number", lookup_expr="gte")
-    max_build = df_filters.NumberFilter(field_name="build_number", lookup_expr="lte")
-    repo = df_filters.CharFilter(field_name="repo__repo_uid", lookup_expr="exact")
-    min_time = df_filters.DateTimeFilter(field_name="timestamp", lookup_expr="gte")
-    max_time = df_filters.DateTimeFilter(field_name="timestamp", lookup_expr="lte")
+    min_build = df_filters.NumberFilter(
+        field_name="build_number", lookup_expr="gte",
+        help_text="Minimum build number (inclusive).",
+    )
+    max_build = df_filters.NumberFilter(
+        field_name="build_number", lookup_expr="lte",
+        help_text="Maximum build number (inclusive).",
+    )
+    repo = df_filters.CharFilter(
+        field_name="repo__repo_uid", lookup_expr="exact",
+        help_text="Filter by repository UID.",
+    )
+    min_time = df_filters.DateTimeFilter(
+        field_name="timestamp", lookup_expr="gte",
+        help_text="Earliest build timestamp (ISO 8601).",
+    )
+    max_time = df_filters.DateTimeFilter(
+        field_name="timestamp", lookup_expr="lte",
+        help_text="Latest build timestamp (ISO 8601).",
+    )
 
     class Meta:
         model = Build
@@ -31,12 +46,30 @@ class BuildFilter(df_filters.FilterSet):
 
 
 class BuildLogFilter(df_filters.FilterSet):
-    min_line = df_filters.NumberFilter(field_name="line_number", lookup_expr="gte")
-    max_line = df_filters.NumberFilter(field_name="line_number", lookup_expr="lte")
-    repo = df_filters.CharFilter(field_name="build__repo__repo_uid", lookup_expr="exact")
-    build = df_filters.NumberFilter(field_name="build__build_number", lookup_expr="exact")
-    min_time = df_filters.DateTimeFilter(field_name="timestamp", lookup_expr="gte")
-    max_time = df_filters.DateTimeFilter(field_name="timestamp", lookup_expr="lte")
+    min_line = df_filters.NumberFilter(
+        field_name="line_number", lookup_expr="gte",
+        help_text="Minimum line number (inclusive).",
+    )
+    max_line = df_filters.NumberFilter(
+        field_name="line_number", lookup_expr="lte",
+        help_text="Maximum line number (inclusive).",
+    )
+    repo = df_filters.CharFilter(
+        field_name="build__repo__repo_uid", lookup_expr="exact",
+        help_text="Filter by repository UID.",
+    )
+    build = df_filters.NumberFilter(
+        field_name="build__build_number", lookup_expr="exact",
+        help_text="Filter by build number.",
+    )
+    min_time = df_filters.DateTimeFilter(
+        field_name="timestamp", lookup_expr="gte",
+        help_text="Earliest log line timestamp (ISO 8601).",
+    )
+    max_time = df_filters.DateTimeFilter(
+        field_name="timestamp", lookup_expr="lte",
+        help_text="Latest log line timestamp (ISO 8601).",
+    )
 
     class Meta:
         model = BuildLogLine
