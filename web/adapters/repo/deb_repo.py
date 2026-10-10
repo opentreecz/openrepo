@@ -43,14 +43,7 @@ class DebRepoAdapter(BaseRepoAdapter):
     def _get_repo_instructions(self):
         dest_gpg_path = f"/usr/share/keyrings/openrepo-{self.repo_uid}.gpg"
 
-        if self.multi_arch:
-            arches = sorted(set(
-                p.architecture for p in self.packages
-                if p.architecture and p.architecture != "all"
-            )) or [DEB_ARCH_DEFAULT]
-            arch_str = ",".join(arches)
-        else:
-            arch_str = DEB_ARCH_LEGACY
+        arch_str = ",".join(self._get_architectures())
 
         repo_address = "apt update && apt install -y curl gnupg\n"
         repo_address += f"curl {self.base_url}/public.gpg | gpg --yes --dearmor -o {dest_gpg_path}\n"
