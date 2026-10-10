@@ -21,27 +21,44 @@ from django.conf import settings
 from repo.models import PGPSigningKey
 
 
-class PGPKeyring:
+def _init_gpg() -> gnupg.GPG:
+    """Create and return a configured gnupg.GPG instance.
+
+    Creates KEYRING_PATH if it does not exist, then handles the gnupg
+    backport quirk where the ``gnupghome`` kwarg may raise ``TypeError``
+    on older versions (falls back to ``homedir``).
+    """
+    if not os.path.isdir(settings.KEYRING_PATH):
+        os.makedirs(settings.KEYRING_PATH)
+
+    # Weird backport behavior with arguments
+    # https://stackoverflow.com/questions/35028852/how-to-set-the-gnupg-home-directory-within-the-gnupg-python-binding
+    try:
+        gpg = gnupg.GPG(gnupghome=settings.KEYRING_PATH)
+    except TypeError:
+        gpg = gnupg.GPG(homedir=settings.KEYRING_PATH)
+
+    gpg.encoding = "utf-8"
+    return gpg
+
+
+class PGPKeyManager:
+    """Manages PGP key lifecycle: generate, delete.
+
+    Callers: ``PGPKeysViewSet`` (REST API).
+    Not responsible for signing or ensuring keys are on the keyring —
+    see ``PGPSigner`` in ``storage/signer.py`` for those operations.
+    """
 
     def __init__(self):
-        if not os.path.isdir(settings.KEYRING_PATH):
-            os.makedirs(settings.KEYRING_PATH)
+        self.gpg = _init_gpg()
 
-        # Weird backport behavior with arguments
-        # https://stackoverflow.com/questions/35028852/how-to-set-the-gnupg-home-directory-within-the-gnupg-python-binding
-        try:
-            self.gpg = gnupg.GPG(gnupghome=settings.KEYRING_PATH)
-        except TypeError:
-            self.gpg = gnupg.GPG(homedir=settings.KEYRING_PATH)
+    def generate_key(self, full_name: str, email: str) -> PGPSigningKey:
+        """Generate a new RSA-4096 key pair and persist it to the database.
 
-        self.gpg.encoding = "utf-8"
-
-    def generate_key(self, full_name, email):
-        """
-        Creates a new PGP key and adds to the database
-        :param full_name: Full name of user
-        :param email: Full e-mail address of user
-        :return: The newly created PGPSigningKey model object
+        :param full_name: Full name of the key owner.
+        :param email: E-mail address of the key owner.
+        :returns: The newly created :class:`~repo.models.PGPSigningKey` instance.
         """
         input_data = self.gpg.gen_key_input(
             key_type="RSA",
@@ -67,39 +84,13 @@ class PGPKeyring:
 
         return new_key
 
-    def delete(self, fingerprint):
-        # Delete private key
-        self.gpg.delete_keys(fingerprint, secret=True, passphrase="")
-        # Delete public key
+    def delete(self, fingerprint: str, passphrase: str = "") -> None:
+        """Remove a key pair from the GPG keyring.
+
+        :param fingerprint: Full key fingerprint.
+        :param passphrase: Passphrase protecting the private key (if any).
+        """
+        self.gpg.delete_keys(fingerprint, secret=True, passphrase=passphrase)
         self.gpg.delete_keys(fingerprint, secret=False)
 
-    def ensure_key(self, pgp_key):
-        """
-        Ensures that the specified key is on the system keychain.  This is necessary so that
-        CLI utilities are able to interact with the key
-        :param fingerprint:
-        """
 
-        public_keys = self.gpg.list_keys(False)
-
-        found = False
-        for key in public_keys:
-            if pgp_key.fingerprint == key["fingerprint"]:
-                found = True
-                break
-
-        if not found:
-            self.gpg.import_keys(pgp_key.private_key_pem)
-            self.gpg.trust_keys(pgp_key.fingerprint, "TRUST_ULTIMATE")
-        # pass
-
-    def detach_sign_file(self, pgp_key, output_file, input_file, clear_sign=False):
-        self.gpg.sign_file(
-            input_file,
-            detach=True,
-            keyid=pgp_key.fingerprint,
-            clearsign=clear_sign,
-            binary=False,
-            output=output_file,
-            extra_args=["-a"],
-        )

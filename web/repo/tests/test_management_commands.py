@@ -73,7 +73,7 @@ class RefreshKeychainCommandTestCase(TestCase):
     """Test the refresh_keychain management command."""
 
     def test_command_ensures_every_key_in_keyring(self):
-        """refresh_keychain calls PGPKeyring.ensure_key for every stored key"""
+        """refresh_keychain calls PGPSigner.ensure_key for every stored key"""
         from django.core.management import call_command
 
         key_a = PGPSigningKey.objects.create(
@@ -92,15 +92,15 @@ class RefreshKeychainCommandTestCase(TestCase):
         )
 
         out = StringIO()
-        with patch("repo.management.commands.refresh_keychain.PGPKeyring") as mock_keyring_cls:
-            mock_keyring = MagicMock()
-            mock_keyring_cls.return_value = mock_keyring
+        with patch("repo.management.commands.refresh_keychain.PGPSigner") as mock_signer_cls:
+            mock_signer = MagicMock()
+            mock_signer_cls.return_value = mock_signer
 
             call_command("refresh_keychain", stdout=out)
 
-            mock_keyring.ensure_key.assert_any_call(key_a)
-            mock_keyring.ensure_key.assert_any_call(key_b)
-            self.assertEqual(mock_keyring.ensure_key.call_count, 2)
+            mock_signer.ensure_key.assert_any_call(key_a)
+            mock_signer.ensure_key.assert_any_call(key_b)
+            self.assertEqual(mock_signer.ensure_key.call_count, 2)
         self.assertIn("Refreshed 2 PGP key(s) in keyring", out.getvalue())
 
     def test_command_with_no_keys(self):
@@ -108,13 +108,13 @@ class RefreshKeychainCommandTestCase(TestCase):
         from django.core.management import call_command
 
         out = StringIO()
-        with patch("repo.management.commands.refresh_keychain.PGPKeyring") as mock_keyring_cls:
-            mock_keyring = MagicMock()
-            mock_keyring_cls.return_value = mock_keyring
+        with patch("repo.management.commands.refresh_keychain.PGPSigner") as mock_signer_cls:
+            mock_signer = MagicMock()
+            mock_signer_cls.return_value = mock_signer
 
             call_command("refresh_keychain", stdout=out)
 
-            mock_keyring.ensure_key.assert_not_called()
+            mock_signer.ensure_key.assert_not_called()
         self.assertIn("Refreshed 0 PGP key(s) in keyring", out.getvalue())
 
 

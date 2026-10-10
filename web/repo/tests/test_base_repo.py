@@ -363,7 +363,7 @@ class SetupRepoTestCase(TestCase):
     def tearDown(self):
         shutil.rmtree(self.test_dir)
 
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_setup_repo_success_creates_symlink(self, mock_ensure_key):
         """build_repo creates versioned dir, generates structure, and updates symlink"""
         from adapters.repo.orchestrator import build_repo
@@ -381,7 +381,7 @@ class SetupRepoTestCase(TestCase):
         build = Build.objects.get(repo=self.repo, build_number=1)
         self.assertEqual(build.completion_status, Build.STATUS_COMPLETE_SUCCESS)
 
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_setup_repo_increments_refresh_count(self, mock_ensure_key):
         """build_repo increments refresh_count each run"""
         from adapters.repo.orchestrator import build_repo
@@ -391,7 +391,7 @@ class SetupRepoTestCase(TestCase):
         self.repo.refresh_from_db()
         self.assertEqual(self.repo.refresh_count, 2)
 
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_setup_repo_removes_old_dir_after_second_run(self, mock_ensure_key):
         """build_repo cleans up the old versioned directory after a refresh"""
         from adapters.repo.orchestrator import build_repo
@@ -406,7 +406,7 @@ class SetupRepoTestCase(TestCase):
         self.assertFalse(os.path.isdir(old_dir))
 
     @patch("adapters.repo.generic_repo.GenericRepoAdapter._generate_repo_structure", return_value=False)
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_setup_repo_records_failure_status(self, mock_ensure_key, mock_gen):
         """build_repo sets STATUS_COMPLETE_ERROR when _generate_repo_structure fails"""
         from adapters.repo.orchestrator import build_repo
@@ -416,7 +416,7 @@ class SetupRepoTestCase(TestCase):
         build = Build.objects.get(repo=self.repo)
         self.assertEqual(build.completion_status, Build.STATUS_COMPLETE_ERROR)
 
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_setup_repo_removes_preexisting_dest_dir(self, mock_ensure_key):
         """build_repo wipes out a stale versioned directory that already exists before regenerating"""
         # Pre-create a stale directory from a previous run, with a leftover file in it.
@@ -437,7 +437,7 @@ class SetupRepoTestCase(TestCase):
         self.assertTrue(os.path.islink(symlink_path))
 
     @patch("adapters.repo.generic_repo.GenericRepoAdapter._generate_repo_structure", side_effect=RuntimeError("boom"))
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_setup_repo_records_exception_status(self, mock_ensure_key, mock_gen):
         """build_repo catches exceptions from _generate_repo_structure, logs them, and marks the build failed"""
         from adapters.repo.orchestrator import build_repo

@@ -87,7 +87,7 @@ class AdapterTestCase(TestCase):
         self.assertEqual(adapter.get_architecture(), "all")
 
     @patch("subprocess.run")
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_deb_repo_generation(self, mock_ensure_key, mock_run):
         """Test that DebRepoAdapter triggers the correct commands for repo generation"""
         # Mock successful subprocess execution
@@ -168,7 +168,7 @@ class AdapterTestCase(TestCase):
         self.assertEqual(adapter.get_architecture(), "x86_64")
 
     @patch("subprocess.run")
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_rpm_repo_generation(self, mock_ensure_key, mock_run):
         """Test that RpmRepoAdapter triggers the correct commands (createrepo, gpg)"""
         mock_proc = MagicMock()

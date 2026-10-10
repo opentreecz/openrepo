@@ -2,7 +2,7 @@
 
 This is the *only* module that touches both the Django ORM **and** the repo
 adapters.  It assembles the injected dependencies (``PackageInfo`` list,
-``RepoConfig``, ``DjangoBuildLogger``, ``PGPKeyring``) and calls the
+``RepoConfig``, ``DjangoBuildLogger``, ``PGPSigner``) and calls the
 adapter's ``setup_repo()`` method.
 """
 import logging
@@ -12,7 +12,7 @@ from django.conf import settings
 from django.db.models import F
 
 from repo.models import Build, Package, Repository
-from repo.storage.keyring import PGPKeyring
+from repo.storage.signer import PGPSigner
 
 from .django_build_logger import DjangoBuildLogger
 from .types import PackageInfo, RepoConfig, SigningKeyInfo
@@ -65,7 +65,7 @@ def build_repo(repo_uid: str) -> bool:
             passphrase=repo.signing_key.passphrase,
             private_key_pem=repo.signing_key.private_key_pem,
         )
-        signer = PGPKeyring()
+        signer = PGPSigner()
 
     # Atomically increment refresh_count
     Repository.objects.filter(repo_uid=repo_uid).update(

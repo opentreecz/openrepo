@@ -33,7 +33,7 @@ from rest_framework.response import Response
 
 from repo.models import Build, BuildLogLine, Package, PGPSigningKey, Repository, UploadTask
 from repo.storage.filemanager import RepoFileManager
-from repo.storage.keyring import PGPKeyring
+from repo.storage.keyring import PGPKeyManager
 
 from .errors import ApiErrorCode, api_error
 from .filters import BuildFilter, BuildLogFilter
@@ -143,7 +143,7 @@ class PGPKeysViewSet(viewsets.ModelViewSet):
         except Exception:
             raise rest_framework.exceptions.ValidationError({"email": "Invalid e-mail address"})
 
-        keyring = PGPKeyring()
+        keyring = PGPKeyManager()
         keyring.generate_key(full_name, email)
 
         return Response(status=rest_framework.status.HTTP_201_CREATED)
@@ -165,7 +165,7 @@ class PGPKeysViewSet(viewsets.ModelViewSet):
                 rest_framework.status.HTTP_409_CONFLICT,
             )
 
-        keyring = PGPKeyring()
+        keyring = PGPKeyManager()
         keyring.delete(instance.fingerprint, passphrase=instance.passphrase)
 
         self.perform_destroy(instance)

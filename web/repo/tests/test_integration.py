@@ -240,11 +240,12 @@ class DebRepoIntegrationTest(APITestCase):
                          f"Release.gpg should verify: {verify.stderr}")
 
     def test_pgp_key_generation_and_signing(self):
-        """Generate a PGP key via PGPKeyring and sign a file with it"""
-        from repo.storage.keyring import PGPKeyring
+        """Generate a PGP key via PGPKeyManager and sign a file via PGPSigner"""
+        from repo.storage.keyring import PGPKeyManager
+        from repo.storage.signer import PGPSigner
 
-        keyring = PGPKeyring()
-        new_key = keyring.generate_key("E2E Test User", "e2e@example.com")
+        manager = PGPKeyManager()
+        new_key = manager.generate_key("E2E Test User", "e2e@example.com")
         self.assertIsNotNone(new_key.fingerprint)
 
         import tempfile
@@ -255,7 +256,8 @@ class DebRepoIntegrationTest(APITestCase):
         output_file = tempfile.NamedTemporaryFile(delete=False, suffix='.asc')
         output_file.close()
 
-        keyring.detach_sign_file(new_key, output_file.name, input_file.name)
+        signer = PGPSigner()
+        signer.detach_sign_file(new_key, output_file.name, input_file.name)
         self.assertTrue(os.path.isfile(output_file.name))
 
         with open(output_file.name, 'r') as f:

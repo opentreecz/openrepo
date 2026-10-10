@@ -352,6 +352,7 @@ class ArchitectureValidationWarningTest(APITestCase):
     """Test that unknown architectures produce warning logs during upload."""
 
     def setUp(self):
+        import tempfile
         User = get_user_model()
         self.admin = User.objects.create_superuser(username="warn-admin", password="p")
         self.token = Token.objects.get(user=self.admin).key
@@ -369,6 +370,14 @@ class ArchitectureValidationWarningTest(APITestCase):
             signing_key=self.signing_key,
             multi_arch=True,
         )
+        self._storage = tempfile.mkdtemp()
+        self._old_storage = settings.STORAGE_PATH
+        settings.STORAGE_PATH = self._storage
+
+    def tearDown(self):
+        import shutil
+        settings.STORAGE_PATH = self._old_storage
+        shutil.rmtree(self._storage, ignore_errors=True)
 
     @patch("threading.Thread.start", lambda self: self.run())
     def test_unknown_architecture_logs_warning(self):

@@ -56,7 +56,7 @@ class RebuildRepoTaskTest(TestCase):
     def tearDown(self):
         shutil.rmtree(self.test_dir)
 
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_rebuild_clears_is_stale_on_success(self, mock_ensure):
         """rebuild_repo_task calls build_repo and clears is_stale."""
         from repo.tasks import rebuild_repo_task
@@ -150,7 +150,7 @@ class OrchestratorTest(TestCase):
     def tearDown(self):
         shutil.rmtree(self.test_dir)
 
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_build_repo_creates_build_record(self, mock_ensure):
         """build_repo creates a Build with STATUS_COMPLETE_SUCCESS."""
         from adapters.repo.orchestrator import build_repo
@@ -160,7 +160,7 @@ class OrchestratorTest(TestCase):
         self.assertEqual(build.completion_status, Build.STATUS_COMPLETE_SUCCESS)
         self.assertIsNotNone(build.total_duration_sec)
 
-    @patch("repo.storage.keyring.PGPKeyring.ensure_key")
+    @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_build_repo_increments_refresh_count(self, mock_ensure):
         """build_repo increments the repo's refresh_count."""
         from adapters.repo.orchestrator import build_repo

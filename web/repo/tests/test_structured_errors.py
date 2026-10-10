@@ -122,7 +122,7 @@ class StructuredErrorApiTestCase(APITestCase):
     def test_delete_pgp_key_not_in_use_succeeds(self):
         """Deleting a PGP key not referenced by any repo succeeds (204)."""
         unused_key = _make_signing_key(suffix="unused")
-        with patch("repo.storage.keyring.PGPKeyring.delete"):
+        with patch("repo.storage.keyring.PGPKeyManager.delete"):
             response = self.client.delete(f"/api/signingkeys/{unused_key.fingerprint}/")
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 

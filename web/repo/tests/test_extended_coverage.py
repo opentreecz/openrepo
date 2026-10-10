@@ -45,9 +45,9 @@ class PGPKeyCreateAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("email", response.data.get("detail", response.data))
 
-    @patch("repo.api.views.PGPKeyring")
+    @patch("repo.api.views.PGPKeyManager")
     def test_create_key_with_valid_params_calls_keyring(self, mock_keyring_cls):
-        """Creating a key with valid params calls PGPKeyring.generate_key"""
+        """Creating a key with valid params calls PGPKeyManager.generate_key"""
         mock_keyring = MagicMock()
         mock_keyring_cls.return_value = mock_keyring
 
@@ -55,7 +55,7 @@ class PGPKeyCreateAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         mock_keyring.generate_key.assert_called_once_with("Test User", "test@example.com")
 
-    @patch("repo.api.views.PGPKeyring")
+    @patch("repo.api.views.PGPKeyManager")
     def test_delete_signing_key_not_referenced_succeeds(self, mock_keyring_cls):
         """Deleting an unreferenced signing key returns 204"""
         mock_keyring = MagicMock()
