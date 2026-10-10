@@ -25,7 +25,7 @@ from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
@@ -60,19 +60,33 @@ from .util import MultipleFieldLookupMixin
 logger = logging.getLogger("openrepo_web")
 
 
+@extend_schema_view(
+    list=extend_schema(description="List all user accounts.", tags=["users"]),
+    create=extend_schema(description="Create a new user account.", tags=["users"]),
+    retrieve=extend_schema(description="Retrieve a user account.", tags=["users"]),
+    update=extend_schema(description="Update a user account (full replace).", tags=["users"]),
+    partial_update=extend_schema(description="Partially update a user account.", tags=["users"]),
+    destroy=extend_schema(description="Delete a user account.", tags=["users"]),
+)
 class UserViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows users to be viewed or edited.
-    """
+    """Manage user accounts and API keys."""
 
     queryset = User.objects.all().order_by("-date_joined")
     serializer_class = UserSerializer
+    filter_backends = [SearchFilter]
+    search_fields = ["username", "email"]
 
 
+@extend_schema_view(
+    list=extend_schema(description="List all repositories.", tags=["repos"]),
+    create=extend_schema(description="Create a new repository.", tags=["repos"]),
+    retrieve=extend_schema(description="Retrieve a repository summary.", tags=["repos"]),
+    update=extend_schema(description="Update a repository (full replace).", tags=["repos"]),
+    partial_update=extend_schema(description="Partially update a repository.", tags=["repos"]),
+    destroy=extend_schema(description="Delete a repository and all its packages.", tags=["repos"]),
+)
 class ReposViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows groups to be viewed or edited.
-    """
+    """Repository management (list, create, update, delete)."""
 
     lookup_field = "repo_uid"
     queryset = (
@@ -80,6 +94,11 @@ class ReposViewSet(viewsets.ModelViewSet):
         .select_related("promote_to").prefetch_related("write_access")
     )
     serializer_class = RepoSummarySerializer
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = ["repo_type"]
+    search_fields = ["repo_uid"]
+    ordering_fields = ["repo_uid", "last_updated", "package_count"]
+    ordering = ["repo_uid"]
 
     def get_serializer_class(self):
         # On create, we want to provide more details than on the list retrieve
@@ -91,7 +110,14 @@ class ReposViewSet(viewsets.ModelViewSet):
         serializer.save()
 
 
+@extend_schema_view(
+    list=extend_schema(description="List all PGP signing keys.", tags=["signing-keys"]),
+    retrieve=extend_schema(description="Retrieve a PGP signing key by fingerprint.", tags=["signing-keys"]),
+    update=extend_schema(description="Update PGP key metadata.", tags=["signing-keys"]),
+    partial_update=extend_schema(description="Partially update PGP key metadata.", tags=["signing-keys"]),
+)
 class PGPKeysViewSet(viewsets.ModelViewSet):
+    """PGP signing key management (generate, list, download, delete)."""
 
     queryset = PGPSigningKey.objects.all().order_by("-name")
     serializer_class = PGPKeySerializer
@@ -102,6 +128,7 @@ class PGPKeysViewSet(viewsets.ModelViewSet):
         request=PGPKeyCreateRequestSerializer,
         responses={201: None},
         description="Generate a new PGP signing key pair.",
+        tags=["signing-keys"],
     )
     def create(self, request, *args, **kwargs):
 
@@ -121,6 +148,11 @@ class PGPKeysViewSet(viewsets.ModelViewSet):
 
         return Response(status=rest_framework.status.HTTP_201_CREATED)
 
+    @extend_schema(
+        responses={204: None, 409: ErrorResponseSerializer},
+        description="Delete a PGP signing key. Returns 409 if the key is in use by a repository.",
+        tags=["signing-keys"],
+    )
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
 
@@ -142,6 +174,7 @@ class PGPKeysViewSet(viewsets.ModelViewSet):
     @extend_schema(
         responses={(200, "application/pgp-keys"): OpenApiTypes.BINARY},
         description="Download the public PGP key in ASCII-armored format.",
+        tags=["signing-keys"],
     )
     @action(detail=True, methods=["get"])
     def download(self, request, fingerprint=None):
@@ -152,17 +185,25 @@ class PGPKeysViewSet(viewsets.ModelViewSet):
         return response
 
 
+@extend_schema_view(
+    retrieve=extend_schema(description="Retrieve the currently authenticated user's account and API key.", tags=["auth"]),
+)
 class WhoAmIViewSet(rest_framework.mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Returns the authenticated user's profile and API token."""
     serializer_class = UserDetailSerializer
 
     def get_object(self):
         return self.request.user
 
 
+@extend_schema_view(
+    retrieve=extend_schema(description="Retrieve full repository detail and configuration.", tags=["repos"]),
+    update=extend_schema(description="Update repository configuration (full replace).", tags=["repos"]),
+    partial_update=extend_schema(description="Partially update repository configuration.", tags=["repos"]),
+    destroy=extend_schema(description="Delete a repository and all its packages.", tags=["repos"]),
+)
 class RepoViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows groups to be viewed or edited.
-    """
+    """Single repository detail, update, and delete."""
 
     lookup_field = "repo_uid"
     queryset = Repository.objects.all()
@@ -180,29 +221,38 @@ class RepoViewSet(viewsets.ModelViewSet):
             instance.save()
 
 
+@extend_schema_view(
+    list=extend_schema(
+        description="List packages in a repository. Supports filtering, search, and ordering.",
+        tags=["packages"],
+        parameters=[
+            OpenApiParameter("repo_uid", str, OpenApiParameter.PATH, description="Repository identifier."),
+        ],
+    ),
+)
 class PackagesViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint that allows groups to be viewed or edited.
-    """
+    """Package listing with filtering, search, and ordering."""
 
     lookup_field = "repo__repo_uid"
     queryset = Package.objects.all()
     serializer_class = PackageSummarySerializer
-    filter_backends = [SearchFilter, OrderingFilter]
+    filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
+    filterset_fields = {
+        "package_name": ["exact", "icontains"],
+        "version": ["exact"],
+        "architecture": ["exact"],
+        "filename": ["icontains"],
+        "checksum_sha512": ["exact"],
+    }
     search_fields = ["package_name", "filename", "version", "architecture"]
-    ordering_fields = ["package_name", "version", "architecture", "upload_date"]
+    ordering_fields = ["package_name", "version", "architecture", "upload_date", "filename"]
     ordering = ["-upload_date"]
 
     def get_queryset(self):
         repo_uid = self.kwargs["repo_uid"]
         if not Repository.objects.filter(repo_uid=repo_uid).exists():
             raise rest_framework.exceptions.NotFound(f"Repo {repo_uid} not found")
-        queryset = Package.objects.filter(repo__repo_uid=repo_uid).select_related("repo")
-        # Optional architecture filter
-        architecture = self.request.query_params.get("architecture")
-        if architecture:
-            queryset = queryset.filter(architecture=architecture)
-        return queryset
+        return Package.objects.filter(repo__repo_uid=repo_uid).select_related("repo")
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
@@ -223,38 +273,48 @@ class PackagesViewSet(viewsets.ModelViewSet):
         return queryset
 
 
+@extend_schema_view(
+    retrieve=extend_schema(description="Retrieve full package detail.", tags=["packages"]),
+    update=extend_schema(description="Update package metadata (full replace).", tags=["packages"]),
+    partial_update=extend_schema(description="Partially update package metadata.", tags=["packages"]),
+    destroy=extend_schema(description="Delete a package from the repository.", tags=["packages"]),
+)
 class PackageViewSet(MultipleFieldLookupMixin, viewsets.ModelViewSet):
-    """
-    API endpoint that allows groups to be viewed or edited.
-    """
+    """Single package detail, update, and delete."""
 
     lookup_fields = ("repo__repo_uid", "package_uid")
     queryset = Package.objects.all()
     serializer_class = PackageDetailSerializer
 
 
+@extend_schema_view(
+    list=extend_schema(description="List repository builds. Supports filtering by repo, build number, and time range.", tags=["builds"]),
+)
 class BuildViewSet(rest_framework.mixins.ListModelMixin, viewsets.GenericViewSet):
-    """
-    API endpoint that allows groups to be viewed or edited.
-    """
+    """Build history for repository metadata generation."""
 
     queryset = Build.objects.all().order_by("-build_number").select_related("repo")
     serializer_class = BuildSerializer
 
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = BuildFilter
+    ordering_fields = ["build_number", "timestamp", "total_duration_sec"]
+    ordering = ["-build_number"]
 
 
+@extend_schema_view(
+    list=extend_schema(description="List build log lines. Supports filtering by build, repo, log level, and time range.", tags=["builds"]),
+)
 class BuildLogViewSet(rest_framework.mixins.ListModelMixin, viewsets.GenericViewSet):
-    """
-    API endpoint that allows groups to be viewed or edited.
-    """
+    """Build log lines from repository metadata generation runs."""
 
     queryset = BuildLogLine.objects.all().select_related("build")
     serializer_class = BuildLogSerializer
 
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, OrderingFilter]
     filterset_class = BuildLogFilter
+    ordering_fields = ["line_number", "timestamp"]
+    ordering = ["line_number"]
 
 
 class CopyViewSet(viewsets.ViewSet):
@@ -264,6 +324,7 @@ class CopyViewSet(viewsets.ViewSet):
         request=CopySerializer,
         responses={200: PackageDetailSerializer, 409: ErrorResponseSerializer},
         description="Copy a package to another repository.",
+        tags=["packages"],
     )
     def create(self, request, repo_uid, package_uid):
         try:
@@ -342,6 +403,7 @@ class UploadViewSet(viewsets.ViewSet):
             "Upload a package file. Returns a task ID for async status polling. "
             "Returns 409 if the package already exists and overwrite is not set."
         ),
+        tags=["upload"],
     )
     def create(self, request, repo_uid):
         try:
@@ -401,7 +463,14 @@ class UploadViewSet(viewsets.ViewSet):
         return Response({"task_id": str(task.pk)}, status=rest_framework.status.HTTP_202_ACCEPTED)
 
 
+@extend_schema_view(
+    retrieve=extend_schema(
+        description="Poll the status of an asynchronous upload task. Returns 404 if the task does not exist or the user lacks access.",
+        tags=["upload"],
+    ),
+)
 class UploadStatusView(viewsets.ViewSet):
+    """Upload task status polling endpoint."""
     serializer_class = UploadTaskSerializer
 
     def retrieve(self, request, task_id):

@@ -238,18 +238,22 @@ REST_FRAMEWORK = {
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "OpenRepo API",
-    "DESCRIPTION": "Package repository management API for Debian APT, RPM, and generic repositories.",
-    "VERSION": "2.8.2",
+    "DESCRIPTION": "Package repository management API for Debian APT, RPM, Alpine APK, and generic file repositories.",
+    "VERSION": "2.9.2",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
+    "LICENSE": {"name": "AGPL-3.0", "url": "https://www.gnu.org/licenses/agpl-3.0.html"},
     "TAGS": [
-        {"name": "repos", "description": "Repository management"},
-        {"name": "packages", "description": "Package listing and details"},
-        {"name": "upload", "description": "Package upload and status"},
-        {"name": "signing-keys", "description": "PGP signing key management"},
-        {"name": "builds", "description": "Build history and logs"},
-        {"name": "auth", "description": "Authentication and user info"},
+        {"name": "repos", "description": "Repository management (CRUD, configuration)."},
+        {"name": "packages", "description": "Package listing, detail, copy, and delete."},
+        {"name": "upload", "description": "Package upload and async status polling."},
+        {"name": "signing-keys", "description": "PGP signing key generation, listing, download, and delete."},
+        {"name": "builds", "description": "Build history and log lines for repository metadata generation."},
+        {"name": "auth", "description": "Authentication and current-user info."},
+        {"name": "users", "description": "User account management."},
+        {"name": "health", "description": "Unauthenticated health check for monitoring."},
     ],
+    "POSTPROCESSING_HOOKS": ["openrepo.schema_hooks.add_global_error_responses"],
 }
 
 LOGGING = {
