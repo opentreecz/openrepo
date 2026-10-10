@@ -102,7 +102,7 @@
 - ~~`base_repo.py:184` uses `shell=True`~~ — ✅ RESOLVED: `shell=False` with argument lists
 - ~~No subprocess timeout~~ — ✅ RESOLVED: 600-second timeout
 - ~~`rpm_repo.py:176-191` duplicates `_copy_packages` logic~~ — ✅ Merged into base class `_copy_packages(packages=)` parameter
-- `deb_repo.py:51-55` and `deb_repo.py:62-65` compute architecture list independently
+- ~~`deb_repo.py` computes architecture list independently in two places~~ — ✅ RESOLVED: `_get_repo_instructions()` now calls `_get_architectures()` instead of inlining the logic
 - `use_python_tools` checked via env var at call-time — should be constructor-time
 
 ### Adapter Registry (`web/adapters/registry.py`) — ✅ NEW
