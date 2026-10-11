@@ -1,23 +1,19 @@
 """Tests for Celery tasks (repo/tasks.py) and the orchestrator."""
 import os
-import shutil
-import tempfile
 from unittest.mock import patch
 
 from django.conf import settings
 from django.test import TestCase
 
-from repo.models import Build, PGPSigningKey, Repository
+from repo.models import Build, Repository
+from repo.tests.fixtures import make_signing_key, TempSettingsMixin
 
 
 class ProcessUploadTaskTest(TestCase):
     """Tests for the process_upload_task Celery task."""
 
     def setUp(self):
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Task Key", email="task@test.com", fingerprint="TASK_FP_1",
-            public_key_pem="pub", private_key_pem="priv",
-        )
+        self.signing_key = make_signing_key(name="Task Key", fingerprint="TASK_FP_1")
         self.repo = Repository.objects.create(
             repo_uid="task-test-repo", repo_type="files", signing_key=self.signing_key,
         )
@@ -30,31 +26,24 @@ class ProcessUploadTaskTest(TestCase):
         mock_process.assert_called_once_with("some-uuid-string")
 
 
-class RebuildRepoTaskTest(TestCase):
+class RebuildRepoTaskTest(TempSettingsMixin, TestCase):
     """Tests for the rebuild_repo_task Celery task."""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = os.path.join(self.test_dir, "storage")
-        settings.REPO_WWW_PATH = os.path.join(self.test_dir, "www")
-        settings.KEYRING_PATH = os.path.join(self.test_dir, "keyring")
-        settings.DEB_DB_PATH = os.path.join(self.test_dir, "debcache.db")
-        settings.RPM_CACHE_DIR = os.path.join(self.test_dir, "rpmcache")
-        for p in [settings.STORAGE_PATH, settings.REPO_WWW_PATH,
-                  settings.KEYRING_PATH, settings.RPM_CACHE_DIR]:
-            os.makedirs(p, exist_ok=True)
+        super().setUp()
+        for name, value in {
+            "DEB_DB_PATH": os.path.join(self.test_dir, "debcache.db"),
+            "RPM_CACHE_DIR": os.path.join(self.test_dir, "rpmcache"),
+        }.items():
+            self._saved_settings[name] = getattr(settings, name, None)
+            setattr(settings, name, value)
+        os.makedirs(settings.RPM_CACHE_DIR, exist_ok=True)
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Rebuild Key", email="rebuild@test.com", fingerprint="REBUILD_FP_1",
-            public_key_pem="pub", private_key_pem="priv",
-        )
+        self.signing_key = make_signing_key(name="Rebuild Key", fingerprint="REBUILD_FP_1")
         self.repo = Repository.objects.create(
             repo_uid="rebuild-task-repo", repo_type="files",
             signing_key=self.signing_key, is_stale=True,
         )
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir)
 
     @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_rebuild_clears_is_stale_on_success(self, mock_ensure):
@@ -82,10 +71,7 @@ class RetentionSweepTaskTest(TestCase):
 
     def test_sweeps_repos_with_retention(self):
         """retention_sweep calls apply_retention_policy_repo for each configured repo."""
-        key = PGPSigningKey.objects.create(
-            name="Ret Key", email="ret@test.com", fingerprint="RET_FP_1",
-            public_key_pem="pub", private_key_pem="priv",
-        )
+        key = make_signing_key(name="Ret Key", fingerprint="RET_FP_1")
         repo = Repository.objects.create(
             repo_uid="ret-sweep-repo", repo_type="files", signing_key=key,
             retention_policy=Repository.RETENTION_KEEP_LATEST_N, retention_keep_count=1,
@@ -102,10 +88,7 @@ class CheckStaleReposTaskTest(TestCase):
 
     def test_dispatches_rebuild_for_stale_repos(self):
         """check_stale_repos dispatches rebuild_repo_task for each stale repo."""
-        key = PGPSigningKey.objects.create(
-            name="Stale Key", email="stale@test.com", fingerprint="STALE_FP_1",
-            public_key_pem="pub", private_key_pem="priv",
-        )
+        key = make_signing_key(name="Stale Key", fingerprint="STALE_FP_1")
         Repository.objects.create(
             repo_uid="stale-check-repo", repo_type="files", signing_key=key, is_stale=True,
         )
@@ -125,30 +108,23 @@ class CheckStaleReposTaskTest(TestCase):
             mock_apply.assert_not_called()
 
 
-class OrchestratorTest(TestCase):
+class OrchestratorTest(TempSettingsMixin, TestCase):
     """Tests for the orchestrator (adapters/repo/orchestrator.py)."""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = os.path.join(self.test_dir, "storage")
-        settings.REPO_WWW_PATH = os.path.join(self.test_dir, "www")
-        settings.KEYRING_PATH = os.path.join(self.test_dir, "keyring")
-        settings.DEB_DB_PATH = os.path.join(self.test_dir, "debcache.db")
-        settings.RPM_CACHE_DIR = os.path.join(self.test_dir, "rpmcache")
-        for p in [settings.STORAGE_PATH, settings.REPO_WWW_PATH,
-                  settings.KEYRING_PATH, settings.RPM_CACHE_DIR]:
-            os.makedirs(p, exist_ok=True)
+        super().setUp()
+        for name, value in {
+            "DEB_DB_PATH": os.path.join(self.test_dir, "debcache.db"),
+            "RPM_CACHE_DIR": os.path.join(self.test_dir, "rpmcache"),
+        }.items():
+            self._saved_settings[name] = getattr(settings, name, None)
+            setattr(settings, name, value)
+        os.makedirs(settings.RPM_CACHE_DIR, exist_ok=True)
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Orch Key", email="orch@test.com", fingerprint="ORCH_FP_1",
-            public_key_pem="pub", private_key_pem="priv",
-        )
+        self.signing_key = make_signing_key(name="Orch Key", fingerprint="ORCH_FP_1")
         self.repo = Repository.objects.create(
             repo_uid="orch-test-repo", repo_type="files", signing_key=self.signing_key,
         )
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir)
 
     @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_build_repo_creates_build_record(self, mock_ensure):

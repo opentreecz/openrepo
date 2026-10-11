@@ -3,20 +3,19 @@
 # version 3 as published by the Free Software Foundation
 
 import yaml
-from django.contrib.auth.models import User
 from django.test import TestCase
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
+
+from repo.tests.fixtures import make_admin
 
 
 class OpenAPISchemaTest(TestCase):
     """Tests for the auto-generated OpenAPI schema."""
 
     def setUp(self):
-        self.user = User.objects.create_superuser("openapi_admin", "openapi_admin@test.com", "admin")
-        self.token = Token.objects.get(user=self.user)
+        self.user, _, auth = make_admin("openapi_admin")
         self.client = APIClient()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        self.client.credentials(HTTP_AUTHORIZATION=auth)
 
     def test_schema_endpoint_returns_yaml(self):
         """GET /api/schema/ returns a valid YAML OpenAPI document."""

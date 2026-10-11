@@ -15,10 +15,8 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import status
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from repo.constants import (
@@ -28,7 +26,8 @@ from repo.constants import (
     get_known_architectures,
     is_known_architecture,
 )
-from repo.models import Package, PGPSigningKey, Repository
+from repo.models import Package, Repository
+from repo.tests.fixtures import make_admin, make_signing_key, TempSettingsMixin
 
 
 class ArchitectureConstantsTest(APITestCase):
@@ -73,17 +72,8 @@ class MultiArchRepoCreationTest(APITestCase):
     """Test creating repos with multi_arch settings."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="arch-admin", password="p")
-        self.token = Token.objects.get(user=self.admin).key
-        self.auth = f"Token {self.token}"
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@test.com",
-            fingerprint="A" * 40,
-            public_key_pem="pub",
-            private_key_pem="priv",
-        )
+        self.admin, self.token, self.auth = make_admin("arch-admin")
+        self.signing_key = make_signing_key(fingerprint="A" * 40)
 
     def test_create_deb_repo_defaults_multi_arch_true(self):
         """New deb repos should default to multi_arch=True when not specified."""
@@ -156,17 +146,8 @@ class MultiArchPackageCoexistenceTest(APITestCase):
     """Test that packages with same name/version but different architectures can coexist."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="coexist-admin", password="p")
-        self.token = Token.objects.get(user=self.admin).key
-        self.auth = f"Token {self.token}"
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@test.com",
-            fingerprint="B" * 40,
-            public_key_pem="pub",
-            private_key_pem="priv",
-        )
+        self.admin, self.token, self.auth = make_admin("coexist-admin")
+        self.signing_key = make_signing_key(fingerprint="B" * 40)
         self.repo = Repository.objects.create(
             repo_uid="multi-arch-repo",
             repo_type="deb",
@@ -254,17 +235,8 @@ class ArchitectureFilterAPITest(APITestCase):
     """Test the architecture query parameter filter in the packages API."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="filter-admin", password="p")
-        self.token = Token.objects.get(user=self.admin).key
-        self.auth = f"Token {self.token}"
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@test.com",
-            fingerprint="C" * 40,
-            public_key_pem="pub",
-            private_key_pem="priv",
-        )
+        self.admin, self.token, self.auth = make_admin("filter-admin")
+        self.signing_key = make_signing_key(fingerprint="C" * 40)
         self.repo = Repository.objects.create(
             repo_uid="filter-repo",
             repo_type="deb",
@@ -352,18 +324,8 @@ class ArchitectureValidationWarningTest(APITestCase):
     """Test that unknown architectures produce warning logs during upload."""
 
     def setUp(self):
-        import tempfile
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="warn-admin", password="p")
-        self.token = Token.objects.get(user=self.admin).key
-        self.auth = f"Token {self.token}"
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@test.com",
-            fingerprint="D" * 40,
-            public_key_pem="pub",
-            private_key_pem="priv",
-        )
+        self.admin, self.token, self.auth = make_admin("warn-admin")
+        self.signing_key = make_signing_key(fingerprint="D" * 40)
         self.repo = Repository.objects.create(
             repo_uid="warn-repo",
             repo_type="deb",
@@ -375,7 +337,6 @@ class ArchitectureValidationWarningTest(APITestCase):
         settings.STORAGE_PATH = self._storage
 
     def tearDown(self):
-        import shutil
         settings.STORAGE_PATH = self._old_storage
         shutil.rmtree(self._storage, ignore_errors=True)
 
@@ -417,17 +378,8 @@ class MultiArchRetentionTest(APITestCase):
     """Test that retention policies apply per-architecture independently."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="ret-admin", password="p")
-        self.token = Token.objects.get(user=self.admin).key
-        self.auth = f"Token {self.token}"
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@test.com",
-            fingerprint="E" * 40,
-            public_key_pem="pub",
-            private_key_pem="priv",
-        )
+        self.admin, self.token, self.auth = make_admin("ret-admin")
+        self.signing_key = make_signing_key(fingerprint="E" * 40)
 
         self.storage = tempfile.mkdtemp()
         self._old_storage = settings.STORAGE_PATH
@@ -523,17 +475,8 @@ class RpmMultiArchRepoTest(APITestCase):
     """Test RPM multi-architecture repository generation."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="rpm-arch-admin", password="p")
-        self.token = Token.objects.get(user=self.admin).key
-        self.auth = f"Token {self.token}"
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@test.com",
-            fingerprint="F" * 40,
-            public_key_pem="pub",
-            private_key_pem="priv",
-        )
+        self.admin, self.token, self.auth = make_admin("rpm-arch-admin")
+        self.signing_key = make_signing_key(fingerprint="F" * 40)
 
     def test_rpm_multi_arch_instructions_contain_basearch(self):
         """RPM multi_arch repo instructions should use $basearch in baseurl."""

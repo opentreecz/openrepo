@@ -1,38 +1,16 @@
-from django.contrib.auth import get_user_model
-from repo.models import PGPSigningKey, Repository
+from repo.models import Repository
 from rest_framework import status
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-
-def _make_admin(username: str):
-    User = get_user_model()
-    User.objects.filter(username=username).delete()
-    return User.objects.create_superuser(username=username, password='password123')
-
-
-def _make_user(username: str):
-    User = get_user_model()
-    User.objects.filter(username=username).delete()
-    return User.objects.create_user(username=username, password='password123')
-
-
-def _make_key():
-    return PGPSigningKey.objects.create(
-        name="Test Key", email="test@example.com",
-        fingerprint="ABCDEF1234567890",
-        public_key_pem="dummy public", private_key_pem="dummy private",
-    )
+from repo.tests.fixtures import make_admin, make_signing_key
 
 
 class CircularPromoteDetectionTest(APITestCase):
     """Tests for circular promote_to detection in RepoDetailSerializer"""
 
     def setUp(self):
-        self.admin = _make_admin('circ-admin')
-        self.token = Token.objects.get(user=self.admin).key
-        self.auth = f'Token {self.token}'
-        self.signing_key = _make_key()
+        self.admin, self.token, self.auth = make_admin('circ-admin')
+        self.signing_key = make_signing_key(fingerprint="ABCDEF1234567890")
         self.repo_a = Repository.objects.create(repo_uid='repo-a', repo_type='deb')
         self.repo_b = Repository.objects.create(repo_uid='repo-b', repo_type='deb')
 

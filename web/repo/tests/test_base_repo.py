@@ -1,9 +1,7 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import datetime
 import os
-import shutil
 import subprocess
-import tempfile
 from unittest.mock import MagicMock, patch
 
 from django.conf import settings
@@ -11,32 +9,23 @@ from django.test import TestCase
 
 from adapters.repo.base_repo import BaseRepoAdapter
 from adapters.repo.generic_repo import GenericRepoAdapter
-from repo.models import Build, BuildLogLine, Package, PGPSigningKey, Repository
+from repo.models import Build, BuildLogLine, Package, Repository
+from repo.tests.fixtures import make_signing_key, TempSettingsMixin
 
 
-class BaseRepoAdapterBuildLogTestCase(TestCase):
+class BaseRepoAdapterBuildLogTestCase(TempSettingsMixin, TestCase):
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = os.path.join(self.test_dir, "storage")
-        settings.REPO_WWW_PATH = os.path.join(self.test_dir, "www")
-        settings.KEYRING_PATH = os.path.join(self.test_dir, "keyring")
+        super().setUp()
+        self._saved_settings["DEB_DB_PATH"] = getattr(settings, "DEB_DB_PATH", None)
+        self._saved_settings["RPM_CACHE_DIR"] = getattr(settings, "RPM_CACHE_DIR", None)
         settings.DEB_DB_PATH = os.path.join(self.test_dir, "debcache.db")
         settings.RPM_CACHE_DIR = os.path.join(self.test_dir, "rpmcache")
+        os.makedirs(settings.RPM_CACHE_DIR, exist_ok=True)
 
-        for p in [settings.STORAGE_PATH, settings.REPO_WWW_PATH, settings.KEYRING_PATH, settings.RPM_CACHE_DIR]:
-            os.makedirs(p, exist_ok=True)
-
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@example.com",
-            fingerprint="BASEREPO_TEST_FP",
-            public_key_pem="pub",
-            private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="Test Key", email="test@example.com", fingerprint="BASEREPO_TEST_FP",
         )
         self.repo = Repository.objects.create(repo_uid="base-repo-test", repo_type="deb", signing_key=self.signing_key)
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir)
 
     def _make_adapter(self):
         adapter = GenericRepoAdapter(self.repo)
@@ -337,31 +326,21 @@ class BaseRepoAdapterBuildLogTestCase(TestCase):
             adapter._get_repo_instructions()
 
 
-class SetupRepoTestCase(TestCase):
+class SetupRepoTestCase(TempSettingsMixin, TestCase):
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = os.path.join(self.test_dir, "storage")
-        settings.REPO_WWW_PATH = os.path.join(self.test_dir, "www")
-        settings.KEYRING_PATH = os.path.join(self.test_dir, "keyring")
+        super().setUp()
+        self._saved_settings["DEB_DB_PATH"] = getattr(settings, "DEB_DB_PATH", None)
+        self._saved_settings["RPM_CACHE_DIR"] = getattr(settings, "RPM_CACHE_DIR", None)
         settings.DEB_DB_PATH = os.path.join(self.test_dir, "debcache.db")
         settings.RPM_CACHE_DIR = os.path.join(self.test_dir, "rpmcache")
+        os.makedirs(settings.RPM_CACHE_DIR, exist_ok=True)
 
-        for p in [settings.STORAGE_PATH, settings.REPO_WWW_PATH, settings.KEYRING_PATH, settings.RPM_CACHE_DIR]:
-            os.makedirs(p, exist_ok=True)
-
-        self.signing_key = PGPSigningKey.objects.create(
-            name="SetupKey",
-            email="setup@example.com",
-            fingerprint="SETUP_REPO_FP_12345",
-            public_key_pem="pub",
-            private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="SetupKey", email="setup@example.com", fingerprint="SETUP_REPO_FP_12345",
         )
         self.repo = Repository.objects.create(
             repo_uid="setup-test-repo", repo_type="files", signing_key=self.signing_key
         )
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir)
 
     @patch("repo.storage.signer.PGPSigner.ensure_key")
     def test_setup_repo_success_creates_symlink(self, mock_ensure_key):
@@ -448,29 +427,15 @@ class SetupRepoTestCase(TestCase):
         self.assertEqual(build.completion_status, Build.STATUS_COMPLETE_ERROR)
 
 
-class GenericRepoAdapterTestCase(TestCase):
+class GenericRepoAdapterTestCase(TempSettingsMixin, TestCase):
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = os.path.join(self.test_dir, "storage")
-        settings.REPO_WWW_PATH = os.path.join(self.test_dir, "www")
-        settings.KEYRING_PATH = os.path.join(self.test_dir, "keyring")
-
-        for p in [settings.STORAGE_PATH, settings.REPO_WWW_PATH, settings.KEYRING_PATH]:
-            os.makedirs(p, exist_ok=True)
-
-        self.signing_key = PGPSigningKey.objects.create(
-            name="GenKey",
-            email="gen@example.com",
-            fingerprint="GEN_REPO_FP",
-            public_key_pem="pub",
-            private_key_pem="priv",
+        super().setUp()
+        self.signing_key = make_signing_key(
+            name="GenKey", email="gen@example.com", fingerprint="GEN_REPO_FP",
         )
         self.repo = Repository.objects.create(
             repo_uid="generic-adapter-test", repo_type="files", signing_key=self.signing_key
         )
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir)
 
     def test_get_repo_instructions_returns_base_url(self):
         """GenericRepoAdapter._get_repo_instructions returns the base URL"""

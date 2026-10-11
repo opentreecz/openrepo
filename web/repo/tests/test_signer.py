@@ -1,5 +1,6 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import os
+import shutil
 import tempfile
 from unittest.mock import MagicMock, patch
 
@@ -8,6 +9,7 @@ from django.test import TestCase
 
 from repo.models import PGPSigningKey
 from repo.storage.signer import PGPSigner
+from repo.tests.fixtures import make_admin, make_signing_key
 
 
 # ---------------------------------------------------------------------------
@@ -186,7 +188,6 @@ class BuildRepoSignerIntegrationTestCase(_PGPSignerBase):
     """
 
     def setUp(self):
-        from django.contrib.auth import get_user_model
         from repo.models import Repository
 
         super().setUp()
@@ -196,10 +197,9 @@ class BuildRepoSignerIntegrationTestCase(_PGPSignerBase):
         os.makedirs(settings.STORAGE_PATH)
         os.makedirs(settings.REPO_WWW_PATH)
 
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="signer-test-admin", password="p")
+        self.admin, _, _ = make_admin("signer-test-admin", password="p")
 
-        self.signing_key = PGPSigningKey.objects.create(
+        self.signing_key = make_signing_key(
             name="Build Test Key",
             email="build@example.com",
             fingerprint="BUILDFP1234567890ABCDEF",
@@ -214,7 +214,6 @@ class BuildRepoSignerIntegrationTestCase(_PGPSignerBase):
         )
 
     def tearDown(self):
-        import shutil
         shutil.rmtree(self.test_dir, ignore_errors=True)
 
     @patch("gnupg.GPG")

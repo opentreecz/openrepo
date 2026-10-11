@@ -5,19 +5,14 @@ from unittest.mock import patch
 from django.conf import settings
 from django.test import TestCase
 
-from repo.models import PGPSigningKey, Repository
+from repo.models import Repository
+from repo.tests.fixtures import make_signing_key
 from repo.worker.bgworker import BackgroundWorker, ChoreList
 
 
 class WorkerTestCase(TestCase):
     def setUp(self):
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@example.com",
-            fingerprint="ABCDEF1234567890",
-            public_key_pem="dummy public",
-            private_key_pem="dummy private",
-        )
+        self.signing_key = make_signing_key(fingerprint="ABCDEF1234567890")
         self.repo = Repository.objects.create(
             repo_uid="test-worker-repo", repo_type="deb", signing_key=self.signing_key, is_stale=True
         )

@@ -1,25 +1,19 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import datetime
 
-from django.contrib.auth import get_user_model
 from django.test import TestCase
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from repo.models import Package, PGPSigningKey, Repository
+from repo.models import Package, Repository
+from repo.tests.fixtures import make_admin, make_signing_key
 
 
 class SerializerValidationTestCase(APITestCase):
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="admin_ser", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
-        self.signing_key = PGPSigningKey.objects.create(
+        self.admin, self.admin_token, _ = make_admin("admin_ser")
+        self.signing_key = make_signing_key(
             name="Test Key",
-            email="test@example.com",
             fingerprint="FINGERPRINT12345",
-            public_key_pem="dummy public",
-            private_key_pem="dummy private",
         )
 
     def test_repo_uid_with_special_chars_rejected(self):
@@ -131,17 +125,11 @@ class SerializerValidationTestCase(APITestCase):
 
 class PromoteToValidationTestCase(APITestCase):
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="admin_promote", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
-        self.signing_key = PGPSigningKey.objects.create(
+        self.admin, self.admin_token, self.auth = make_admin("admin_promote")
+        self.signing_key = make_signing_key(
             name="Promote Key",
-            email="promote@example.com",
             fingerprint="PROMOTE_FP_1234",
-            public_key_pem="pub",
-            private_key_pem="priv",
         )
-        self.auth = f"Token {self.admin_token}"
 
     def _create_repo(self, repo_uid, promote_to=None):
         data = {"repo_uid": repo_uid, "repo_type": "deb", "signing_key": self.signing_key.fingerprint}
@@ -210,13 +198,7 @@ class PromoteToValidationTestCase(APITestCase):
 
 class PackageSerializerTestCase(TestCase):
     def setUp(self):
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Key",
-            email="k@example.com",
-            fingerprint="PKG_SER_FP",
-            public_key_pem="pub",
-            private_key_pem="priv",
-        )
+        self.signing_key = make_signing_key(name="Key", fingerprint="PKG_SER_FP")
         self.repo = Repository.objects.create(repo_uid="pkg-ser-repo", repo_type="deb", signing_key=self.signing_key)
 
     def test_package_relative_path(self):

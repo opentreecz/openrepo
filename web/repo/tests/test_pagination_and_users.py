@@ -8,10 +8,10 @@ import datetime
 
 from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from repo.models import Package, Repository
+from repo.tests.fixtures import make_admin
 
 User = get_user_model()
 
@@ -20,11 +20,7 @@ class PaginationTestCase(APITestCase):
     """E1: Verify pagination behaviour on the packages endpoint."""
 
     def setUp(self):
-        self.user = User.objects.create_superuser(
-            username="pager", email="pager@test.com", password="secret1234"
-        )
-        token = Token.objects.get(user=self.user)
-        self.http_auth = f"Token {token.key}"
+        self.user, _, self.http_auth = make_admin("pager")
 
         self.repo = Repository.objects.create(repo_uid="page-repo", repo_type="files")
 
@@ -101,11 +97,7 @@ class UserViewSetTestCase(APITestCase):
     """E2: CRUD tests for /api/users/ (UserViewSet)."""
 
     def setUp(self):
-        self.admin = User.objects.create_superuser(
-            username="user_crud_admin", email="user_crud_admin@test.com", password="adminpass"
-        )
-        token = Token.objects.get(user=self.admin)
-        self.http_auth = f"Token {token.key}"
+        self.admin, _, self.http_auth = make_admin("user_crud_admin")
 
     # ── List ────────────────────────────────────────────────────────────
 

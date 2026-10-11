@@ -15,7 +15,8 @@ from adapters.file.rpm_adapter import RpmFileAdapter
 from adapters.repo.deb_repo import DebRepoAdapter
 from adapters.repo.fallback_tools import _read_deb_control
 from adapters.repo.rpm_repo import RpmRepoAdapter
-from repo.models import Build, Package, PGPSigningKey, Repository
+from repo.models import Build, Package, Repository
+from repo.tests.fixtures import make_signing_key, TempSettingsMixin
 
 
 def _make_test_deb(path):
@@ -49,32 +50,21 @@ def _make_test_deb(path):
             f.write(b"\n")
 
 
-class AdapterTestCase(TestCase):
+class AdapterTestCase(TempSettingsMixin, TestCase):
     def setUp(self):
+        super().setUp()
         self.repo_uid = "test-deb-repo"
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@example.com",
-            fingerprint="8EC5273D32F78A238F54CBEB66633B39A053B24A",
-            public_key_pem="dummy public",
-            private_key_pem="dummy private",
-        )
-        self.repo = Repository.objects.create(repo_uid=self.repo_uid, repo_type="deb", signing_key=self.signing_key)
-
-        # Setup paths
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = os.path.join(self.test_dir, "storage")
-        settings.REPO_WWW_PATH = os.path.join(self.test_dir, "www")
-        settings.KEYRING_PATH = os.path.join(self.test_dir, "keyring")
+        self._saved_settings["DEB_DB_PATH"] = getattr(settings, "DEB_DB_PATH", None)
+        self._saved_settings["RPM_CACHE_DIR"] = getattr(settings, "RPM_CACHE_DIR", None)
         settings.DEB_DB_PATH = os.path.join(self.test_dir, "debcache.db")
         settings.RPM_CACHE_DIR = os.path.join(self.test_dir, "rpmcache")
+        os.makedirs(settings.RPM_CACHE_DIR, exist_ok=True)
 
-        for p in [settings.STORAGE_PATH, settings.REPO_WWW_PATH, settings.KEYRING_PATH, settings.RPM_CACHE_DIR]:
-            if not os.path.exists(p):
-                os.makedirs(p)
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        self.signing_key = make_signing_key(
+            name="Test Key", email="test@example.com",
+            fingerprint="8EC5273D32F78A238F54CBEB66633B39A053B24A",
+        )
+        self.repo = Repository.objects.create(repo_uid=self.repo_uid, repo_type="deb", signing_key=self.signing_key)
 
     def test_deb_file_adapter_metadata(self):
         """Test that DebFileAdapter extracts correct metadata from a .deb file"""

@@ -1,7 +1,6 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import datetime
 import os
-import tempfile
 import threading
 import uuid
 from unittest.mock import patch
@@ -14,20 +13,15 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from repo.models import Package, PGPSigningKey, Repository, UploadTask
+from repo.tests.fixtures import make_admin, make_signing_key, TempSettingsMixin
 
 
 class CopyViewSetTestCase(APITestCase):
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="copy_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("copy_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="CopyKey",
-            email="copy@example.com",
-            fingerprint="COPY_FP_12345678",
-            public_key_pem="pub",
-            private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="CopyKey", email="copy@example.com", fingerprint="COPY_FP_12345678",
         )
         self.repo_deb = Repository.objects.create(
             repo_uid="copy-src-deb", repo_type="deb", signing_key=self.signing_key
@@ -183,16 +177,10 @@ class KeepOnlyLatestTestCase(APITestCase):
     """Test keep_only_latest flag behavior during upload and copy."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="latest_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("latest_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="LatestKey",
-            email="latest@example.com",
-            fingerprint="LATEST_FP_1234",
-            public_key_pem="pub",
-            private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="LatestKey", email="latest@example.com", fingerprint="LATEST_FP_1234",
         )
         self.src_repo = Repository.objects.create(
             repo_uid="latest-src", repo_type="deb", signing_key=self.signing_key
@@ -245,16 +233,10 @@ class RepoDetailApiTestCase(APITestCase):
     """Test repo detail endpoint."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="detail_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("detail_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="DetailKey",
-            email="detail@example.com",
-            fingerprint="DETAIL_FP_1234",
-            public_key_pem="pub",
-            private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="DetailKey", email="detail@example.com", fingerprint="DETAIL_FP_1234",
         )
         self.repo = Repository.objects.create(
             repo_uid="detail-repo",
@@ -310,16 +292,10 @@ class BuildApiTestCase(APITestCase):
     """Test build and build log API endpoints."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="build_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("build_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="BuildKey",
-            email="build@example.com",
-            fingerprint="BUILD_FP_1234",
-            public_key_pem="pub",
-            private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="BuildKey", email="build@example.com", fingerprint="BUILD_FP_1234",
         )
         self.repo = Repository.objects.create(
             repo_uid="build-test-repo",
@@ -358,23 +334,15 @@ class BuildApiTestCase(APITestCase):
         self.assertEqual(response.data["results"][0]["command"], "createrepo")
 
 
-class FilenameSanitizationTestCase(APITestCase):
+class FilenameSanitizationTestCase(TempSettingsMixin, APITestCase):
     """Test that uploaded filenames are sanitized against path traversal and control characters."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="san_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        super().setUp()
+        self.admin, self.admin_token, self.auth = make_admin("san_admin")
 
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = self.test_dir
-
-        self.signing_key = PGPSigningKey.objects.create(
-            name="SanKey",
-            email="san@example.com",
-            fingerprint="SAN_FP_12345678",
-            public_key_pem="pub",
-            private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="SanKey", email="san@example.com", fingerprint="SAN_FP_12345678",
         )
         self.repo = Repository.objects.create(
             repo_uid="san-repo", repo_type="files", signing_key=self.signing_key
@@ -429,23 +397,15 @@ class FilenameSanitizationTestCase(APITestCase):
         self.assertNotIn("\x0a", task.filename)
 
 
-class OverwriteUploadTestCase(APITestCase):
+class OverwriteUploadTestCase(TempSettingsMixin, APITestCase):
     """Test the overwrite=true/false behavior during package upload."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="ow_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        super().setUp()
+        self.admin, self.admin_token, self.auth = make_admin("ow_admin")
 
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = self.test_dir
-
-        self.signing_key = PGPSigningKey.objects.create(
-            name="OWKey",
-            email="ow@example.com",
-            fingerprint="OW_FP_12345678",
-            public_key_pem="pub",
-            private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="OWKey", email="ow@example.com", fingerprint="OW_FP_12345678",
         )
         self.repo = Repository.objects.create(repo_uid="ow-repo", repo_type="deb", signing_key=self.signing_key)
 
@@ -522,16 +482,10 @@ class PGPKeyApiTestCase(APITestCase):
     """Test PGP key management API."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="pgp_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("pgp_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="PGPKey",
-            email="pgp@example.com",
-            fingerprint="PGP_FP_12345678",
-            public_key_pem="pub",
-            private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="PGPKey", email="pgp@example.com", fingerprint="PGP_FP_12345678",
         )
 
     def test_list_signing_keys(self):
@@ -560,15 +514,13 @@ class UploadStatusAuthorizationTestCase(APITestCase):
 
     def setUp(self):
         User = get_user_model()
-        self.admin = User.objects.create_superuser(username="authz_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("authz_admin")
 
         self.regular_user = User.objects.create_user(username="authz_regular", password="password123")
         self.regular_token = Token.objects.get(user=self.regular_user).key
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="AuthzKey", email="authz@example.com",
-            fingerprint="AUTHZ_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="AuthzKey", email="authz@example.com", fingerprint="AUTHZ_FP_12345678",
         )
         self.repo = Repository.objects.create(
             repo_uid="authz-repo", repo_type="files", signing_key=self.signing_key,
@@ -612,20 +564,15 @@ class UploadStatusAuthorizationTestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
 
-class MaxUploadSizeTestCase(APITestCase):
+class MaxUploadSizeTestCase(TempSettingsMixin, APITestCase):
     """Test that MAX_UPLOAD_SIZE is enforced."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="size_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        super().setUp()
+        self.admin, self.admin_token, self.auth = make_admin("size_admin")
 
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = self.test_dir
-
-        self.signing_key = PGPSigningKey.objects.create(
-            name="SizeKey", email="size@example.com",
-            fingerprint="SIZE_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="SizeKey", email="size@example.com", fingerprint="SIZE_FP_12345678",
         )
         self.repo = Repository.objects.create(
             repo_uid="size-repo", repo_type="files", signing_key=self.signing_key,
@@ -654,9 +601,7 @@ class VersionHeaderMiddlewareTestCase(APITestCase):
     """Test that the X-OpenRepo-Version header is present on API responses."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="ver_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("ver_admin")
 
     def test_api_response_has_version_header(self):
         """All API responses include X-OpenRepo-Version header."""
@@ -673,9 +618,7 @@ class V1PrefixRoutingTestCase(APITestCase):
     """Test that /api/v1/ prefix works as an alias for /api/."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="v1_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("v1_admin")
 
     def test_v1_repos_returns_same_as_api_repos(self):
         """GET /api/v1/repos/ returns the same data as GET /api/repos/."""
@@ -696,13 +639,10 @@ class PackagesSearchFilterTestCase(APITestCase):
     """Test package search and filter functionality."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="search_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("search_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="SearchKey", email="search@example.com",
-            fingerprint="SEARCH_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="SearchKey", email="search@example.com", fingerprint="SEARCH_FP_12345678",
         )
         self.repo = Repository.objects.create(
             repo_uid="search-repo", repo_type="deb", signing_key=self.signing_key,
@@ -772,13 +712,10 @@ class RepoFilteringTestCase(APITestCase):
     """Test repository filtering and search."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="rf_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("rf_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="RFKey", email="rf@example.com",
-            fingerprint="RF_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="RFKey", email="rf@example.com", fingerprint="RF_FP_12345678",
         )
         Repository.objects.create(repo_uid="rf-deb", repo_type="deb", signing_key=self.signing_key)
         Repository.objects.create(repo_uid="rf-rpm", repo_type="rpm", signing_key=self.signing_key)
@@ -807,13 +744,10 @@ class PatchSupportTestCase(APITestCase):
     """Test PATCH (partial update) support on repos and packages."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="patch_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("patch_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="PatchKey", email="patch@example.com",
-            fingerprint="PATCH_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="PatchKey", email="patch@example.com", fingerprint="PATCH_FP_12345678",
         )
         self.repo = Repository.objects.create(
             repo_uid="patch-repo", repo_type="deb", signing_key=self.signing_key,
@@ -836,13 +770,10 @@ class UploadTaskSerializerFieldsTestCase(APITestCase):
     """Test that UploadTaskSerializer includes repo_uid and sha512."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="field_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("field_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="FieldKey", email="field@example.com",
-            fingerprint="FIELD_FP_12345678", public_key_pem="pub", private_key_pem="priv",
+        self.signing_key = make_signing_key(
+            name="FieldKey", email="field@example.com", fingerprint="FIELD_FP_12345678",
         )
         self.repo = Repository.objects.create(
             repo_uid="field-repo", repo_type="files", signing_key=self.signing_key,

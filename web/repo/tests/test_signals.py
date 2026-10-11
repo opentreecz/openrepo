@@ -6,24 +6,16 @@ from unittest.mock import patch
 from django.conf import settings
 from django.test import TestCase
 
-from repo.models import Package, PGPSigningKey, Repository
+from repo.models import Package, Repository
+from repo.tests.fixtures import make_signing_key, TempSettingsMixin
 
 
-class SignalTestCase(TestCase):
+class SignalTestCase(TempSettingsMixin, TestCase):
     def setUp(self):
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@example.com",
-            fingerprint="ABCDEF1234567890",
-            public_key_pem="dummy public",
-            private_key_pem="dummy private",
-        )
+        super().setUp()
+        self.signing_key = make_signing_key(fingerprint="ABCDEF1234567890")
         self.repo = Repository.objects.create(repo_uid="test-repo", repo_type="deb", signing_key=self.signing_key)
         self.repo2 = Repository.objects.create(repo_uid="test-repo-2", repo_type="deb", signing_key=self.signing_key)
-
-        settings.STORAGE_PATH = "/tmp/openrepo_signal_test"
-        if not os.path.exists(settings.STORAGE_PATH):
-            os.makedirs(settings.STORAGE_PATH)
 
     def test_repo_staleness_on_package_add(self):
         """Test that the repository is marked as stale when a package is added"""

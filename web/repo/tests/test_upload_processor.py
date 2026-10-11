@@ -1,35 +1,26 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import os
-import shutil
-import tempfile
 import uuid
 from unittest.mock import MagicMock, patch
 
-from django.conf import settings
 from django.test import TestCase
 
 from repo.api.upload_processor import process_upload
-from repo.models import Package, PGPSigningKey, Repository, UploadTask
+from repo.models import Package, Repository, UploadTask
+from repo.tests.fixtures import make_signing_key, TempSettingsMixin
 
 
-class ProcessUploadTestCase(TestCase):
+class ProcessUploadTestCase(TempSettingsMixin, TestCase):
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = self.test_dir
+        super().setUp()
 
-        self.signing_key = PGPSigningKey.objects.create(
+        self.signing_key = make_signing_key(
             name="Upload Key",
-            email="upload@example.com",
             fingerprint="UPLOAD_FP_1234567890",
-            public_key_pem="pub",
-            private_key_pem="priv",
         )
         self.repo = Repository.objects.create(
             repo_uid="upload-proc-repo", repo_type="files", signing_key=self.signing_key
         )
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def _write_stored_file(self, content=b"package contents"):
         path = os.path.join(self.test_dir, str(uuid.uuid4()))

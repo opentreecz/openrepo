@@ -1,25 +1,23 @@
 # Copyright 2022 by Open Kilt LLC. All rights reserved.
 import datetime
 import os
-import tempfile
 from unittest.mock import MagicMock, patch
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
 from repo.models import Build, BuildLogLine, Package, PGPSigningKey, Repository
+from repo.tests.fixtures import TempSettingsMixin, make_admin, make_signing_key
 
 
 class PGPKeyCreateAPITestCase(APITestCase):
     """Test PGP key creation via the API."""
 
     def setUp(self):
+        self.admin, self.admin_token, self.auth = make_admin("pgpcreate_admin")
         User = get_user_model()
-        self.admin = User.objects.create_superuser(username="pgpcreate_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
         self.regular_user = User.objects.create_user(username="pgpcreate_user", password="password123")
         self.regular_token = Token.objects.get(user=self.regular_user).key
 
@@ -80,16 +78,12 @@ class BuildFilterAPITestCase(APITestCase):
     """Test build filtering via API."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="bfilt_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("bfilt_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
+        self.signing_key = make_signing_key(
             name="FilterKey",
             email="filter@example.com",
             fingerprint="FILTER_FP_123",
-            public_key_pem="pub",
-            private_key_pem="priv",
         )
         self.repo = Repository.objects.create(
             repo_uid="filter-repo",
@@ -203,22 +197,17 @@ class ModelStringRepresentationTestCase(APITestCase):
         self.assertEqual(str(repo), "my-test-repo")
 
 
-class PackagesViewSetTestCase(APITestCase):
+class PackagesViewSetTestCase(TempSettingsMixin, APITestCase):
     """Test the packages list endpoint."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="pkglist_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = self.test_dir
+        super().setUp()
+        self.admin, self.admin_token, self.auth = make_admin("pkglist_admin")
 
-        self.signing_key = PGPSigningKey.objects.create(
+        self.signing_key = make_signing_key(
             name="PkgKey",
             email="pkg@example.com",
             fingerprint="PKGLIST_FP_123",
-            public_key_pem="pub",
-            private_key_pem="priv",
         )
         self.repo = Repository.objects.create(
             repo_uid="pkglist-repo",
@@ -346,15 +335,12 @@ class PGPKeyDownloadTestCase(APITestCase):
     """Test the PGP signing key /download/ action."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="pgpdl_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
-        self.signing_key = PGPSigningKey.objects.create(
+        self.admin, self.admin_token, self.auth = make_admin("pgpdl_admin")
+        self.signing_key = make_signing_key(
             name="Download Key",
             email="download@example.com",
             fingerprint="ABCDEF00112233445566",
             public_key_pem="-----BEGIN PGP PUBLIC KEY BLOCK-----\ndummy\n-----END PGP PUBLIC KEY BLOCK-----",
-            private_key_pem="priv",
         )
 
     def test_download_returns_public_key_with_attachment_headers(self):
@@ -374,9 +360,7 @@ class UploadStatusViewTestCase(APITestCase):
     """Test the upload-status polling endpoint."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="uploadstatus_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("uploadstatus_admin")
 
     def test_status_for_nonexistent_task_returns_404(self):
         """GET /api/upload-status/<random-uuid>/ returns 404 when the task doesn't exist"""
@@ -422,12 +406,10 @@ class AdapterRepoInitTestCase(APITestCase):
     """Test the get_repo_adapter factory function."""
 
     def setUp(self):
-        self.signing_key = PGPSigningKey.objects.create(
+        self.signing_key = make_signing_key(
             name="RouterKey",
             email="router@example.com",
             fingerprint="ROUTER_FP_1234",
-            public_key_pem="pub",
-            private_key_pem="priv",
         )
 
     def test_get_repo_adapter_deb(self):
@@ -470,12 +452,10 @@ class RpmRepoInstructionsTestCase(APITestCase):
     """Test RPM repo instructions generation."""
 
     def setUp(self):
-        self.signing_key = PGPSigningKey.objects.create(
+        self.signing_key = make_signing_key(
             name="RPMKey",
             email="rpm@example.com",
             fingerprint="RPM_INSTRUCTIONS_FP",
-            public_key_pem="pub",
-            private_key_pem="priv",
         )
         self.repo = Repository.objects.create(
             repo_uid="rpm-instructions-test", repo_type="rpm", signing_key=self.signing_key
@@ -504,9 +484,7 @@ class UserListAPITestCase(APITestCase):
     """Test the users API endpoint."""
 
     def setUp(self):
-        User = get_user_model()
-        self.admin = User.objects.create_superuser(username="user_list_admin", password="password123")
-        self.admin_token = Token.objects.get(user=self.admin).key
+        self.admin, self.admin_token, self.auth = make_admin("user_list_admin")
 
     def test_list_users_as_superuser(self):
         """Superuser can list users"""

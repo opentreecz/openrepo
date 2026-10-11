@@ -21,21 +21,17 @@ Verifies that:
 """
 
 import os
-import shutil
-import tempfile
 from unittest.mock import patch
 
-from django.conf import settings
-from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase, APIClient
 from django.test import TestCase
 
 from repo.api.errors import ApiErrorCode
 from repo.api.exception_handler import _flatten_detail
 from repo.api.upload_processor import process_upload
-from repo.models import Package, PGPSigningKey, Repository, UploadTask
+from repo.models import Package, Repository, UploadTask
+from repo.tests.fixtures import make_admin, make_signing_key, TempSettingsMixin
 
 
 # ---------------------------------------------------------------------------
@@ -43,25 +39,20 @@ from repo.models import Package, PGPSigningKey, Repository, UploadTask
 # ---------------------------------------------------------------------------
 
 def _make_signing_key(suffix=""):
-    return PGPSigningKey.objects.create(
+    return make_signing_key(
         name=f"Test Key{suffix}",
         email=f"test{suffix}@example.com",
         fingerprint=f"TESTFP{suffix}1234567890",
-        public_key_pem="pub",
-        private_key_pem="priv",
     )
 
 
-class StructuredErrorApiTestCase(APITestCase):
+class StructuredErrorApiTestCase(TempSettingsMixin, APITestCase):
     """API-level tests that exercise the error envelope via real HTTP calls."""
 
     def setUp(self):
-        User = get_user_model()
-        self.user = User.objects.create_superuser(
-            username="errtest", email="errtest@test.com", password="password123"
-        )
-        token = Token.objects.get(user=self.user)
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
+        super().setUp()
+        self.user, _, auth = make_admin("errtest")
+        self.client.credentials(HTTP_AUTHORIZATION=auth)
 
         self.signing_key = _make_signing_key()
         self.repo = Repository.objects.create(
@@ -69,12 +60,6 @@ class StructuredErrorApiTestCase(APITestCase):
             repo_type="files",
             signing_key=self.signing_key,
         )
-
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = self.test_dir
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
 
     # ── Error envelope shape ────────────────────────────────────────────────
 
@@ -168,12 +153,11 @@ class StructuredErrorApiTestCase(APITestCase):
 # UploadTask.error_code tests (unit-level, via upload_processor)
 # ---------------------------------------------------------------------------
 
-class UploadTaskErrorCodeTestCase(TestCase):
+class UploadTaskErrorCodeTestCase(TempSettingsMixin, TestCase):
     """Verify that error_code is set correctly on UploadTask after processing."""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        settings.STORAGE_PATH = self.test_dir
+        super().setUp()
 
         self.signing_key = _make_signing_key(suffix="proc")
         self.repo = Repository.objects.create(
@@ -181,9 +165,6 @@ class UploadTaskErrorCodeTestCase(TestCase):
             repo_type="files",
             signing_key=self.signing_key,
         )
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir, ignore_errors=True)
 
     def _write_stored_file(self, content=b"data"):
         import uuid

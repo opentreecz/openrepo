@@ -4,7 +4,8 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from repo.models import PGPSigningKey, Repository
+from repo.models import Repository
+from repo.tests.fixtures import make_admin, make_signing_key
 
 
 class NegativeApiTestCase(APITestCase):
@@ -13,17 +14,13 @@ class NegativeApiTestCase(APITestCase):
         # Regular user (not superuser)
         self.user = User.objects.create_user(username="normie", password="password123")
         # Superuser
-        self.admin = User.objects.create_superuser(username="admin_user", password="password123")
+        self.admin, self.admin_token, _ = make_admin("admin_user")
 
         self.user_token = Token.objects.get(user=self.user).key
-        self.admin_token = Token.objects.get(user=self.admin).key
 
-        self.signing_key = PGPSigningKey.objects.create(
+        self.signing_key = make_signing_key(
             name="Test Key",
-            email="test@example.com",
             fingerprint="ABCDEF1234567890",
-            public_key_pem="dummy public",
-            private_key_pem="dummy private",
         )
 
     def test_unauthorized_repo_create(self):

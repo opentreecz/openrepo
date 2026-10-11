@@ -6,7 +6,8 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from repo.models import Package, PGPSigningKey, Repository
+from repo.models import Package, Repository
+from repo.tests.fixtures import make_admin, make_signing_key
 
 
 class AuthPermissionTestCase(APITestCase):
@@ -15,20 +16,13 @@ class AuthPermissionTestCase(APITestCase):
     def setUp(self):
         User = get_user_model()
         self.regular_user = User.objects.create_user(username="regularuser", password="password123")
-        self.super_user = User.objects.create_superuser(username="superuser", password="password123")
+        self.super_user, self.super_token, _ = make_admin("superuser")
         self.other_user = User.objects.create_user(username="otheruser", password="password123")
 
         self.regular_token = Token.objects.get(user=self.regular_user).key
-        self.super_token = Token.objects.get(user=self.super_user).key
         self.other_token = Token.objects.get(user=self.other_user).key
 
-        self.signing_key = PGPSigningKey.objects.create(
-            name="AuthKey",
-            email="auth@example.com",
-            fingerprint="AUTH_FP_12345678",
-            public_key_pem="pub",
-            private_key_pem="priv",
-        )
+        self.signing_key = make_signing_key(name="AuthKey", fingerprint="AUTH_FP_12345678")
         self.repo = Repository.objects.create(
             repo_uid="auth-test-repo",
             repo_type="deb",

@@ -7,6 +7,7 @@ from django.test import TestCase
 
 from adapters.repo.generic_repo import GenericRepoAdapter, _file_md5, _html_page, _human_size
 from repo.models import Build, Package, Repository
+from repo.tests.fixtures import TempSettingsMixin
 
 
 class GenericRepoHelperTests(TestCase):
@@ -47,32 +48,12 @@ class GenericRepoHelperTests(TestCase):
             shutil.rmtree(d)
 
 
-class GenericRepoAdapterTests(TestCase):
+class GenericRepoAdapterTests(TempSettingsMixin, TestCase):
     """Integration tests for GenericRepoAdapter._generate_repo_structure."""
 
     def setUp(self):
-        self.test_dir = tempfile.mkdtemp()
-        self.orig_storage = getattr(settings, "STORAGE_PATH", None)
-        self.orig_www = getattr(settings, "REPO_WWW_PATH", None)
-        self.orig_keyring = getattr(settings, "KEYRING_PATH", None)
-
-        settings.STORAGE_PATH = os.path.join(self.test_dir, "storage")
-        settings.REPO_WWW_PATH = os.path.join(self.test_dir, "www")
-        settings.KEYRING_PATH = os.path.join(self.test_dir, "keyring")
-
-        for p in [settings.STORAGE_PATH, settings.REPO_WWW_PATH, settings.KEYRING_PATH]:
-            os.makedirs(p, exist_ok=True)
-
+        super().setUp()
         self.repo = Repository.objects.create(repo_uid="generic-test", repo_type="files")
-
-    def tearDown(self):
-        shutil.rmtree(self.test_dir)
-        if self.orig_storage is not None:
-            settings.STORAGE_PATH = self.orig_storage
-        if self.orig_www is not None:
-            settings.REPO_WWW_PATH = self.orig_www
-        if self.orig_keyring is not None:
-            settings.KEYRING_PATH = self.orig_keyring
 
     def _create_package(self, name="tool", version="1.0.0", arch="any", content=b"binary data"):
         """Create a Package record and the corresponding file on disk."""

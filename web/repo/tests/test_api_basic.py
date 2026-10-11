@@ -17,12 +17,11 @@ import threading
 from unittest.mock import patch
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from rest_framework import status
-from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
-from repo.models import Package, PGPSigningKey, Repository
+from repo.models import Package, Repository
+from repo.tests.fixtures import make_admin, make_signing_key, TempSettingsMixin
 
 
 def _run_thread_inline(self):
@@ -30,33 +29,14 @@ def _run_thread_inline(self):
     self.run()
 
 
-class RepoRestApiTestCase(APITestCase):
+class RepoRestApiTestCase(TempSettingsMixin, APITestCase):
     def setUp(self):
-
-        User = get_user_model()
-        self.user = User.objects.create_superuser(username="matt", email="matt@test.com", password="4242424242")
-
-        token = Token.objects.get(user=self.user)
-        self.api_key = token.key
-
-        self.http_auth = f"Token {self.api_key}"
-        self.headers = {"Authorization": f"Token {self.api_key}"}
-
-        settings.STORAGE_PATH = "/tmp/openrepo_test"
-        if not os.path.exists(settings.STORAGE_PATH):
-            os.makedirs(settings.STORAGE_PATH)
+        super().setUp()
+        self.user, self.api_key, self.http_auth = make_admin("matt")
+        self.headers = {"Authorization": self.http_auth}
 
         # Create a dummy signing key as the app currently requires it during validation
-        self.signing_key = PGPSigningKey.objects.create(
-            name="Test Key",
-            email="test@example.com",
-            fingerprint="ABCDEF1234567890",
-            public_key_pem="dummy public",
-            private_key_pem="dummy private",
-        )
-
-    def tearDown(self):
-        pass
+        self.signing_key = make_signing_key(fingerprint="ABCDEF1234567890")
 
     def test_repo_create_delete(self):
         """Create, list, and delete a repo"""
