@@ -40,7 +40,9 @@ urlpatterns = [
     path(r"<slug:repo_uid>/upload/", views.UploadViewSet.as_view({"post": "create"}), name="upload"),
     path(
         r"<slug:repo_uid>/pkg/<slug:package_uid>/",
-        views.PackageViewSet.as_view({"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}),
+        views.PackageViewSet.as_view(
+            {"get": "retrieve", "put": "update", "patch": "partial_update", "delete": "destroy"}
+        ),
         name="package-detail",
     ),
     path(

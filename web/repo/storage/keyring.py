@@ -92,5 +92,3 @@ class PGPKeyManager:
         """
         self.gpg.delete_keys(fingerprint, secret=True, passphrase=passphrase)
         self.gpg.delete_keys(fingerprint, secret=False)
-
-

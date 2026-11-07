@@ -186,7 +186,10 @@ class PGPKeysViewSet(viewsets.ModelViewSet):
 
 
 @extend_schema_view(
-    retrieve=extend_schema(description="Retrieve the currently authenticated user's account and API key.", tags=["auth"]),
+    retrieve=extend_schema(
+        description="Retrieve the currently authenticated user's account and API key.",
+        tags=["auth"],
+    ),
 )
 class WhoAmIViewSet(rest_framework.mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     """Returns the authenticated user's profile and API token."""
@@ -288,7 +291,10 @@ class PackageViewSet(MultipleFieldLookupMixin, viewsets.ModelViewSet):
 
 
 @extend_schema_view(
-    list=extend_schema(description="List repository builds. Supports filtering by repo, build number, and time range.", tags=["builds"]),
+    list=extend_schema(
+        description="List repository builds. Supports filtering by repo, build number, and time range.",
+        tags=["builds"],
+    ),
 )
 class BuildViewSet(rest_framework.mixins.ListModelMixin, viewsets.GenericViewSet):
     """Build history for repository metadata generation."""
@@ -303,7 +309,10 @@ class BuildViewSet(rest_framework.mixins.ListModelMixin, viewsets.GenericViewSet
 
 
 @extend_schema_view(
-    list=extend_schema(description="List build log lines. Supports filtering by build, repo, log level, and time range.", tags=["builds"]),
+    list=extend_schema(
+        description="List build log lines. Supports filtering by build, repo, log level, and time range.",
+        tags=["builds"],
+    ),
 )
 class BuildLogViewSet(rest_framework.mixins.ListModelMixin, viewsets.GenericViewSet):
     """Build log lines from repository metadata generation runs."""
@@ -465,7 +474,10 @@ class UploadViewSet(viewsets.ViewSet):
 
 @extend_schema_view(
     retrieve=extend_schema(
-        description="Poll the status of an asynchronous upload task. Returns 404 if the task does not exist or the user lacks access.",
+        description=(
+            "Poll the status of an asynchronous upload task. "
+            "Returns 404 if the task does not exist or the user lacks access."
+        ),
         tags=["upload"],
     ),
 )

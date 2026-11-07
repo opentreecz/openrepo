@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OpenRepo API
-  version: 2.9.2
+  version: 2.9.3
   description: Package repository management API for Debian APT, RPM, Alpine APK,
     and generic file repositories.
   license:

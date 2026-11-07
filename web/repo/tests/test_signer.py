@@ -272,7 +272,7 @@ class BuildRepoSignerIntegrationTestCase(_PGPSignerBase):
         from repo.models import Repository
         from adapters.repo.orchestrator import build_repo
 
-        unsigned_repo = Repository.objects.create(
+        Repository.objects.create(
             repo_uid="unsigned-repo",
             repo_type="deb",
             signing_key=None,

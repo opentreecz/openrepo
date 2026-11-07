@@ -239,7 +239,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "OpenRepo API",
     "DESCRIPTION": "Package repository management API for Debian APT, RPM, Alpine APK, and generic file repositories.",
-    "VERSION": "2.9.2",
+    "VERSION": "2.9.3",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "LICENSE": {"name": "AGPL-3.0", "url": "https://www.gnu.org/licenses/agpl-3.0.html"},

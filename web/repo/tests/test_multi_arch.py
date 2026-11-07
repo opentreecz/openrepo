@@ -27,7 +27,7 @@ from repo.constants import (
     is_known_architecture,
 )
 from repo.models import Package, Repository
-from repo.tests.fixtures import make_admin, make_signing_key, TempSettingsMixin
+from repo.tests.fixtures import make_admin, make_signing_key
 
 
 class ArchitectureConstantsTest(APITestCase):
