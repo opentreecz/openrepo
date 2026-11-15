@@ -5,33 +5,46 @@ on:
     branches: ['**']
   pull_request:
   schedule:
-    # Weekly run against latest runner image / apt packages / python-apt HEAD
-    # to catch drift even when nothing in this repo has changed.
+    # Weekly run against latest PyPI releases / apt packages / python-apt
+    # commit on the pinned ubuntu:24.04 base image, to catch drift even when
+    # nothing in this repo has changed.
     - cron: '11 4 * * 1'
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Pinned to the same base image as the Dockerfile and build-packages.yml
+    # (ubuntu:24.04). python-apt's compiled extension is tightly coupled to
+    # the libapt-pkg ABI of the OS it's built against, so testing on
+    # whatever OS "ubuntu-latest" happens to be this month can break on
+    # ABI/toolchain drift unrelated to this repo. Running the actual test
+    # matrix against the same base image we ship keeps that drift out of
+    # the way of ordinary pushes/PRs.
+    container: ubuntu:24.04
 
     env:
       OPENREPO_VAR_DIR: /tmp/openrepo/
       OPENREPO_SECRET_KEY: test-secret-key-for-ci-only
       OPENREPO_DISABLE_THROTTLE: "1"
+      DEBIAN_FRONTEND: noninteractive
 
     steps:
-      - uses: actions/checkout@v7
-
       - name: Install system dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+          apt-get update
+          apt-get install -y \
+            build-essential \
             createrepo-c \
+            git \
             gpg \
             libapt-pkg-dev \
             libpq-dev \
+            python3 \
             python3-dev \
             python3-pip \
             python3-venv
+
+      - uses: actions/checkout@v7
 
       - name: Set up Python venv
         run: |
