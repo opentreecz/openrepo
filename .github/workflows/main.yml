@@ -33,6 +33,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y \
+            apt-utils \
             build-essential \
             createrepo-c \
             git \
