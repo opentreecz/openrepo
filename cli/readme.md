@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="../docs/assets/logo.png" alt="OpenRepo" width="96" height="96">
+  <img src="../docs/assets/openrepo-logo.svg" alt="OpenRepo" width="360">
 </p>
 
 > **Full documentation:** [opentreecz.github.io/openrepo/cli](https://opentreecz.github.io/openrepo/cli)

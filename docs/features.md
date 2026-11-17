@@ -5,7 +5,7 @@ nav_order: 3
 ---
 
 <p align="center">
-  <img src="assets/logo.png" alt="OpenRepo" width="120" height="120">
+  <img src="assets/openrepo-logo.svg" alt="OpenRepo" width="360">
 </p>
 
 # Features
