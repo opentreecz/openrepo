@@ -67,7 +67,9 @@ Copy `.env.example` to `.env` and configure before starting:
 |---|---|---|
 | `OPENREPO_SECRET_KEY` | *(required)* | Django secret key — **must be set**. Generate with: `python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'`. `DJANGO_SECRET_KEY` also accepted. |
 | `OPENREPO_PG_PASSWORD` | `postgres` | PostgreSQL password |
-| `OPENREPO_PG_HOSTNAME` | `db` | PostgreSQL host |
+| `OPENREPO_PG_HOSTNAME` | `localhost` | PostgreSQL host (`db` in Compose) |
+| `OPENREPO_PG_PORT` | `5432` | PostgreSQL port |
+| `OPENREPO_PG_CONN_MAX_AGE` | `300` | Connection lifetime in seconds; `0` disables persistence |
 | `OPENREPO_PG_DATABASE` | `openrepo` | PostgreSQL database name |
 | `OPENREPO_PG_USERNAME` | `postgres` | PostgreSQL username |
 | `OPENREPO_PORT` | `7376` | Host port for the web UI |
@@ -79,7 +81,62 @@ Copy `.env.example` to `.env` and configure before starting:
 | `OPENREPO_ALLOWED_HOSTS` | *(none)* | Comma-separated additional hostnames for Django's `ALLOWED_HOSTS` (localhost, 127.0.0.1, and `OPENREPO_DOMAIN` are always included) |
 | `OPENREPO_CSRF_TRUSTED_ORIGINS` | *(none)* | Space-separated trusted CSRF origins for reverse proxies |
 | `OPENREPO_MAX_UPLOAD_SIZE` | `2147483648` | Maximum upload file size in bytes (default 2 GB) |
+| `OPENREPO_REDIS_URL` | `redis://redis:6379/0` | Celery broker and result backend |
+| `OPENREPO_CELERY_EAGER` | `0` | Set `1` for synchronous tasks in development/tests only |
+| `OPENREPO_DISABLE_THROTTLE` | `0` | Set `1` to disable API throttling in development/tests |
+| `OPENREPO_USE_PYTHON_TOOLS` | `0` | Set `1` to use pure-Python Debian/RPM repository tooling |
 | `RPM_VERSION_IGNORE_BUILD_NUM` | `false` | Set `true` to strip the RPM release (build number) suffix from versions |
+
+The complete commented template is [`.env.example`](https://github.com/opentreecz/openrepo/blob/main/.env.example).
+For the Python CLI, export `OPENREPO_SERVER` (default `http://localhost:7376`)
+and `OPENREPO_APIKEY` (your API token) in the shell running the command.
+
+### Passing environment overrides into Docker
+
+Compose reads `.env` for interpolation; it does not automatically pass all its
+values into containers. The supplied Compose file interpolates
+`OPENREPO_SECRET_KEY` (with `DJANGO_SECRET_KEY` as a fallback),
+`OPENREPO_PG_DATABASE`, `OPENREPO_PG_USERNAME`, `OPENREPO_PG_PASSWORD`, and
+`OPENREPO_PORT`. It fixes the database backend to PostgreSQL, host to `db`, port
+to `5432`, and Redis URL to `redis://redis:6379/0`.
+
+To make the Redis URL configurable, replace the existing Redis environment entry
+in **each of Django, worker, and beat** with:
+
+```yaml
+      - OPENREPO_REDIS_URL=${OPENREPO_REDIS_URL:-redis://redis:6379/0}
+```
+
+Then set `OPENREPO_REDIS_URL` in `.env`. Add other application overrides to the
+appropriate service's `environment` in the same way. Apply changes with
+`docker compose up -d`; a plain restart does not reload container environment.
+Native deployments must export variables or load them through their service
+manager; Django does not automatically read this `.env` file.
+
+### Uploads return HTTP 500 while package listing works
+
+This indicates a failure in the server-side upload request. Listing packages
+does not test storage writes or task dispatch. Uploads write the file, create an
+`UploadTask`, and publish a Celery task before returning HTTP 202. An unavailable
+Redis broker, storage errors, or database errors can interrupt these steps.
+The generic HTML 500 response does not identify which step failed.
+
+Inspect the Django traceback at the failed request's timestamp:
+
+```bash
+docker compose ps
+docker compose logs --since 30m django worker redis
+docker compose exec redis redis-cli ping
+docker compose exec django ./django/manage.py migrate --check
+docker compose exec django df -h /var/lib/openrepo /tmp
+docker compose exec django df -i /var/lib/openrepo /tmp
+```
+
+The Redis command checks the bundled Redis service; for an external broker,
+check that service and connectivity from Django instead. Confirm that Django
+and workers use the same broker and shared storage. Correct the cause reported
+by the traceback before retrying one project. Do not enable eager tasks as a
+production workaround for a broken broker.
 
 ---
 

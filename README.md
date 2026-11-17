@@ -78,7 +78,9 @@ Default credentials:
 |---|---|---|
 | `OPENREPO_SECRET_KEY` | *(required)* | Django secret key — **must be set**. Generate with: `python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())'`. `DJANGO_SECRET_KEY` is also accepted for compatibility. |
 | `OPENREPO_PG_PASSWORD` | `postgres` | PostgreSQL password |
-| `OPENREPO_PG_HOSTNAME` | `db` | PostgreSQL host |
+| `OPENREPO_PG_HOSTNAME` | `localhost` | PostgreSQL host (`db` in Compose) |
+| `OPENREPO_PG_PORT` | `5432` | PostgreSQL port |
+| `OPENREPO_PG_CONN_MAX_AGE` | `300` | Database connection lifetime in seconds |
 | `OPENREPO_PG_DATABASE` | `openrepo` | PostgreSQL database name |
 | `OPENREPO_PG_USERNAME` | `postgres` | PostgreSQL username |
 | `OPENREPO_DB_TYPE` | `sqlite` | Database backend: `sqlite` or `postgresql` |
@@ -89,9 +91,23 @@ Default credentials:
 | `OPENREPO_ALLOWED_HOSTS` | *(none)* | Comma-separated additional hostnames for Django's `ALLOWED_HOSTS` (localhost, 127.0.0.1, and `OPENREPO_DOMAIN` are always included) |
 | `OPENREPO_CSRF_TRUSTED_ORIGINS` | *(none)* | Space-separated list of trusted CSRF origins for reverse proxies |
 | `OPENREPO_MAX_UPLOAD_SIZE` | `2147483648` | Maximum upload file size in bytes (default 2 GB) |
+| `OPENREPO_PORT` | `7376` | Compose host port for the web UI |
+| `OPENREPO_REDIS_URL` | `redis://redis:6379/0` | Celery broker and result backend; required for queued uploads and rebuilds |
+| `OPENREPO_CELERY_EAGER` | `0` | Set `1` for synchronous tasks in development/tests only |
+| `OPENREPO_DISABLE_THROTTLE` | `0` | Set `1` to disable API throttling in development/tests |
+| `OPENREPO_USE_PYTHON_TOOLS` | `0` | Set `1` to use pure-Python Debian/RPM repository tooling |
 | `RPM_VERSION_IGNORE_BUILD_NUM` | `false` | Set `true` to use only the RPM `version` field and ignore the `release` (build number) suffix |
 
-Copy `.env.example` to `.env` and fill in values before starting.
+Copy [`.env.example`](.env.example) to `.env` and fill in values before starting.
+The Python CLI separately accepts `OPENREPO_SERVER` (default `http://localhost:7376`)
+and `OPENREPO_APIKEY` (no default token).
+
+**Compose does not automatically export `.env` into containers.** The supplied
+Compose file interpolates the secret key, database name/user/password, and host
+port. Other overrides must be added to the relevant service's `environment`.
+In particular, the database backend/host/port and Redis URL are fixed in the
+supplied Compose configuration. Keep Django, worker, and beat configuration
+consistent. See [environment setup and upload troubleshooting](docs/getting-started.md#environment-variables).
 
 
 ## CI Integration
