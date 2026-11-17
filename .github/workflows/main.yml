@@ -63,6 +63,10 @@ jobs:
       - name: Prepare var directory
         run: mkdir -p /tmp/openrepo/packages /tmp/openrepo/keyring /tmp/openrepo/www /tmp/openrepo/rpmcache
 
+      - name: Check for missing migrations
+        working-directory: web
+        run: python manage.py makemigrations --check --dry-run
+
       - name: Run tests with coverage
         working-directory: web
         run: |

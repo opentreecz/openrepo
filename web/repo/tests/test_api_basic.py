@@ -65,6 +65,25 @@ class RepoRestApiTestCase(TempSettingsMixin, APITestCase):
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
         self.assertEqual(Repository.objects.count(), 0)
 
+    def test_repo_delete_conflicts_while_rebuild_running(self):
+        """Deleting a repo whose rebuild holds the lock returns 409 REPO_BUSY."""
+        from repo.locks import repo_build_lock
+
+        Repository.objects.create(
+            repo_uid="busy-delete", repo_type="deb", signing_key=self.signing_key,
+        )
+        with self.settings(REPO_DELETE_LOCK_TIMEOUT_SEC=0.3):
+            with repo_build_lock("busy-delete") as acquired:
+                self.assertTrue(acquired)
+                response = self.client.delete("/api/busy-delete/", HTTP_AUTHORIZATION=self.http_auth)
+        self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
+        self.assertEqual(response.json()["code"], "REPO_BUSY")
+        self.assertEqual(Repository.objects.filter(repo_uid="busy-delete").count(), 1)
+
+        # Once the rebuild finished the delete succeeds.
+        response = self.client.delete("/api/busy-delete/", HTTP_AUTHORIZATION=self.http_auth)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
     @patch.object(threading.Thread, "start", _run_thread_inline)
     def test_package_upload_delete(self):
 

@@ -45,21 +45,32 @@ def _queued_path(repo_uid):
 
 
 @contextlib.contextmanager
-def repo_build_lock(repo_uid, blocking=False):
+def repo_build_lock(repo_uid, blocking=False, timeout=None):
     """Hold the exclusive rebuild lock for *repo_uid*.
 
-    Yields ``True`` when the lock was acquired, ``False`` when another
-    process holds it and *blocking* is false.
+    Yields ``True`` when the lock was acquired, ``False`` otherwise.
+
+    * ``blocking=False`` (default): try once.
+    * ``timeout=N``: keep trying for up to *N* seconds.
+    * ``blocking=True`` without a timeout: wait indefinitely.
     """
     fd = os.open(_lock_path(repo_uid), os.O_RDWR | os.O_CREAT, 0o644)
     acquired = False
     try:
-        flags = fcntl.LOCK_EX if blocking else fcntl.LOCK_EX | fcntl.LOCK_NB
-        try:
-            fcntl.flock(fd, flags)
+        if blocking and timeout is None:
+            fcntl.flock(fd, fcntl.LOCK_EX)
             acquired = True
-        except BlockingIOError:
-            acquired = False
+        else:
+            deadline = time.monotonic() + (timeout or 0)
+            while True:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    acquired = True
+                    break
+                except BlockingIOError:
+                    if time.monotonic() >= deadline:
+                        break
+                    time.sleep(0.2)
         yield acquired
     finally:
         if acquired:

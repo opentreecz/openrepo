@@ -239,7 +239,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "OpenRepo API",
     "DESCRIPTION": "Package repository management API for Debian APT, RPM, Alpine APK, and generic file repositories.",
-    "VERSION": "2.10.3",
+    "VERSION": "2.10.4",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "LICENSE": {"name": "AGPL-3.0", "url": "https://www.gnu.org/licenses/agpl-3.0.html"},
@@ -327,6 +327,9 @@ MAX_UPLOAD_SIZE = int(os.getenv("OPENREPO_MAX_UPLOAD_SIZE", str(2 * 1024 ** 3)))
 # In case a repo creation gets frozen in bg worker, this will allow it to reattempt
 REPO_CREATE_TIMEOUT_SEC = 60 * 60 * 2
 
+# How long a repository DELETE waits for a running rebuild of that repo.
+REPO_DELETE_LOCK_TIMEOUT_SEC = float(os.getenv("OPENREPO_REPO_DELETE_LOCK_TIMEOUT", "120"))
+
 # ---------------------------------------------------------------------------
 # Celery configuration
 # ---------------------------------------------------------------------------
@@ -365,6 +368,7 @@ CELERY_BEAT_SCHEDULE = {
     },
     "check-stale-repos": {
         "task": "repo.tasks.check_stale_repos",
-        "schedule": 5.0,  # every 5 seconds
+        # Safety net only: package changes enqueue a rebuild immediately.
+        "schedule": float(os.getenv("OPENREPO_STALE_CHECK_INTERVAL", "60")),
     },
 }

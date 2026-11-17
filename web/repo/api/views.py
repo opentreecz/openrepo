@@ -213,6 +213,28 @@ class RepoViewSet(viewsets.ModelViewSet):
     queryset = Repository.objects.all()
     serializer_class = RepoDetailSerializer
 
+    def destroy(self, request, *args, **kwargs):
+        """Delete the repository once no rebuild of it is running.
+
+        Deleting while a rebuild is inserting Build rows for the repo races
+        the cascade (FK violation -> HTTP 500), so wait for the per-repo
+        build lock; any rebuild queued afterwards sees the repo is gone.
+        """
+        from repo.locks import clear_rebuild_queued, repo_build_lock
+
+        instance = self.get_object()
+        repo_uid = instance.repo_uid
+        with repo_build_lock(repo_uid, timeout=settings.REPO_DELETE_LOCK_TIMEOUT_SEC) as acquired:
+            if not acquired:
+                return api_error(
+                    ApiErrorCode.REPO_BUSY,
+                    f"Repository '{repo_uid}' is being rebuilt; retry the deletion shortly.",
+                    rest_framework.status.HTTP_409_CONFLICT,
+                )
+            self.perform_destroy(instance)
+        clear_rebuild_queued(repo_uid)
+        return Response(status=rest_framework.status.HTTP_204_NO_CONTENT)
+
     def perform_update(self, serializer):
         original_object = self.get_object()
         changes = serializer.validated_data

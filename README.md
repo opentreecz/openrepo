@@ -99,6 +99,9 @@ Default credentials:
 | `OPENREPO_BROKER_CONNECTION_TIMEOUT` | `5` | Seconds to wait for the broker before uploads fall back to in-process handling |
 | `OPENREPO_BROKER_PUBLISH_RETRIES` | `2` | Task publish retries before falling back |
 | `OPENREPO_REBUILD_QUEUED_TTL` | `300` | Seconds a queued rebuild suppresses duplicate dispatches for the same repo |
+| `OPENREPO_STALE_CHECK_INTERVAL` | `60` | Seconds between safety-net scans for stale repositories |
+| `OPENREPO_LOG_PERIODIC_TASKS` | `0` | Set `1` to log every periodic `check_stale_repos` run |
+| `OPENREPO_REPO_DELETE_LOCK_TIMEOUT` | `120` | Seconds a repo DELETE waits for a running rebuild before returning 409 `REPO_BUSY` |
 | `OPENREPO_IMAGE` | `ghcr.io/opentreecz/openrepo:latest` | Compose image for nginx/django/worker/beat |
 | `OPENREPO_CELERY_EAGER` | `0` | Set `1` for synchronous tasks in development/tests only |
 | `OPENREPO_DISABLE_THROTTLE` | `0` | Set `1` to disable API throttling in development/tests |
@@ -459,6 +462,17 @@ Celery broker was unreachable — make sure your Compose file contains the
 `redis` service and sets `OPENREPO_REDIS_URL` for django, worker and beat
 (copy the current `docker-compose.yml`; every setting there can be overridden
 from `.env`).
+
+### Troubleshooting: Redis "Memory overcommit must be enabled"
+
+This Redis startup warning comes from the **host** kernel setting and cannot
+be changed from inside the container. It is harmless for OpenRepo (Redis is
+only the task broker); to silence it run on the Docker host:
+
+```bash
+echo 'vm.overcommit_memory = 1' | sudo tee /etc/sysctl.d/99-redis.conf
+sudo sysctl vm.overcommit_memory=1
+```
 
 ## License
 

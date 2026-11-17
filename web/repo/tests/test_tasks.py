@@ -278,3 +278,24 @@ class KeyringPermissionsTest(TempSettingsMixin, TestCase):
         ensure_keyring_dir()
         mode = stat.S_IMODE(os.stat(settings.KEYRING_PATH).st_mode)
         self.assertEqual(mode, 0o700)
+
+
+class QuietPeriodicTasksFilterTest(TestCase):
+    """Routine check_stale_repos log lines are suppressed; others are kept."""
+
+    def _record(self, msg, level=20):
+        import logging
+        return logging.LogRecord("celery.app.trace", level, __file__, 1, msg, None, None)
+
+    def test_filters_periodic_task_info_lines(self):
+        from openrepo.celery import _QuietPeriodicTasksFilter
+        f = _QuietPeriodicTasksFilter()
+        self.assertFalse(f.filter(self._record(
+            "Task repo.tasks.check_stale_repos[abc] succeeded in 0.003s: None")))
+        self.assertFalse(f.filter(self._record(
+            "Scheduler: Sending due task check-stale-repos (repo.tasks.check_stale_repos)")))
+        self.assertTrue(f.filter(self._record(
+            "Task repo.tasks.rebuild_repo_task[rebuild-deb] succeeded in 1.4s: None")))
+        # Failures of the periodic task are still logged.
+        self.assertTrue(f.filter(self._record(
+            "Task repo.tasks.check_stale_repos[abc] raised unexpected: ValueError()", level=40)))
