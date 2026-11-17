@@ -139,6 +139,7 @@ class Package(models.Model):
     build_date = models.DateTimeField(null=True, blank=True)
     upload_date = models.DateTimeField()
     checksum_sha512 = models.CharField(db_index=True, max_length=512)
+    checksum_sha256 = models.CharField(db_index=True, max_length=64, blank=True, default="")
 
     # Where the file is located on disk relative to the base pool dir (e.g., aa/axbpoiergm)
     def relative_path(self):
@@ -208,6 +209,7 @@ class UploadTask(models.Model):
     overwrite = models.BooleanField(default=False)
     stored_path = models.CharField(max_length=65536)
     sha512 = models.CharField(max_length=512, blank=True)
+    sha256 = models.CharField(max_length=64, blank=True, default="")
     error_message = models.TextField(blank=True)
     # Machine-readable error code set when status="failed" (e.g. "PACKAGE_EXISTS").
     # Empty string means a generic/unclassified failure.

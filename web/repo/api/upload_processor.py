@@ -12,13 +12,17 @@ from repo.models import Package, UploadTask
 from .errors import ApiErrorCode
 from .retention import apply_retention_policy
 from .serializers import PackageDetailSerializer
-from .util import compute_sha512
+from .util import compute_sha256, compute_sha512
 
 logger = logging.getLogger("openrepo_web")
 
 
 class PackageExistsError(Exception):
     """Raised when a package already exists and overwrite is not requested."""
+
+
+class ChecksumMismatchError(Exception):
+    """Raised when the stored file's SHA-256 does not match the expected digest."""
 
 
 def process_upload(task_id):
@@ -39,6 +43,12 @@ def process_upload(task_id):
     overwrite = task.overwrite
 
     try:
+        sha256 = compute_sha256(full_stored_filepath)
+        if task.sha256 and task.sha256.lower() != sha256:
+            raise ChecksumMismatchError(
+                f"SHA-256 checksum mismatch for '{filename}': expected {task.sha256.lower()}, got {sha256}"
+            )
+
         file_info_adapter = create_adapter(repo.repo_type, full_stored_filepath, filename)
 
         if file_info_adapter is None:
@@ -78,7 +88,6 @@ def process_upload(task_id):
             package = Package()
             stored_filename = os.path.relpath(full_stored_filepath, settings.STORAGE_PATH)
             package.package_uid = stored_filename.replace("/", "-")
-            sha512 = compute_sha512(full_stored_filepath)
 
         package.repo = repo
         package.upload_date = datetime.now(tz=timezone.utc)
@@ -88,6 +97,7 @@ def process_upload(task_id):
         package.version = file_info_adapter.get_version()
         package.package_name = file_info_adapter.get_name()
         package.checksum_sha512 = sha512
+        package.checksum_sha256 = sha256
 
         # Warn if architecture is not in the known set for this repo type
         if not is_known_architecture(package.architecture, repo.repo_type):
@@ -103,9 +113,11 @@ def process_upload(task_id):
 
         serializer = PackageDetailSerializer(package)
         task.result_data = serializer.data
+        if not task.sha256:
+            task.sha256 = sha256
         task.status = "completed"
         task.completed_at = datetime.now(tz=timezone.utc)
-        task.save(update_fields=["result_data", "status", "completed_at"])
+        task.save(update_fields=["result_data", "sha256", "status", "completed_at"])
 
     except Exception as e:
         logger.exception(f"Upload processing failed for task {task_id}")
@@ -114,7 +126,12 @@ def process_upload(task_id):
                 os.remove(full_stored_filepath)
             except OSError:
                 pass
-        error_code = ApiErrorCode.PACKAGE_EXISTS if isinstance(e, PackageExistsError) else ""
+        if isinstance(e, PackageExistsError):
+            error_code = ApiErrorCode.PACKAGE_EXISTS
+        elif isinstance(e, ChecksumMismatchError):
+            error_code = ApiErrorCode.CHECKSUM_MISMATCH
+        else:
+            error_code = ""
         task.status = "failed"
         task.error_message = str(e)
         task.error_code = error_code

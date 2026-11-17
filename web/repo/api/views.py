@@ -246,6 +246,7 @@ class PackagesViewSet(viewsets.ModelViewSet):
         "architecture": ["exact"],
         "filename": ["icontains"],
         "checksum_sha512": ["exact"],
+        "checksum_sha256": ["exact"],
     }
     search_fields = ["package_name", "filename", "version", "architecture"]
     ordering_fields = ["package_name", "version", "architecture", "upload_date", "filename"]
@@ -407,10 +408,12 @@ class UploadViewSet(viewsets.ViewSet):
 
     @extend_schema(
         request={"multipart/form-data": UploadSerializer},
-        responses={202: UploadResponseSerializer, 409: ErrorResponseSerializer},
+        responses={202: UploadResponseSerializer, 400: ErrorResponseSerializer, 409: ErrorResponseSerializer},
         description=(
             "Upload a package file. Returns a task ID for async status polling. "
-            "Returns 409 if the package already exists and overwrite is not set."
+            "If `sha256` is provided, the server verifies the uploaded file matches before accepting. "
+            "Returns 400 on validation or checksum mismatch, and 409 if the package already exists "
+            "and overwrite is not set."
         ),
         tags=["upload"],
     )
@@ -434,6 +437,16 @@ class UploadViewSet(viewsets.ViewSet):
 
         overwrite_str = request.POST.get("overwrite", "0").lower()
         overwrite = overwrite_str in ("true", "1", "yes")
+        expected_sha256 = (
+            request.POST.get("sha256")
+            or request.POST.get("checksum_sha256")
+            or ""
+        ).strip().lower()
+        if expected_sha256 and not re.fullmatch(r"[0-9a-f]{64}", expected_sha256):
+            raise rest_framework.exceptions.ValidationError(
+                {"sha256": "Invalid SHA-256 hex digest (must be 64 hexadecimal characters)."}
+            )
+
         filesize = file_uploaded.size
         filename = os.path.basename(file_uploaded.name)
         if not filename or re.search(r'[\x00-\x1f]', filename):
@@ -448,13 +461,27 @@ class UploadViewSet(viewsets.ViewSet):
         os.makedirs(os.path.dirname(full_stored_filepath), exist_ok=True)
 
         sha512_hash = hashlib.sha512()
+        sha256_hash = hashlib.sha256()
         with open(full_stored_filepath, "wb") as outf:
             logger.debug(f"Writing file to {full_stored_filepath}")
             for chunk in file_uploaded.chunks():
                 outf.write(chunk)
                 sha512_hash.update(chunk)
+                sha256_hash.update(chunk)
 
         sha512 = sha512_hash.hexdigest()
+        sha256 = sha256_hash.hexdigest()
+
+        if expected_sha256 and sha256 != expected_sha256:
+            try:
+                os.remove(full_stored_filepath)
+            except OSError:
+                pass
+            return api_error(
+                ApiErrorCode.CHECKSUM_MISMATCH,
+                f"SHA-256 checksum mismatch for '{filename}': expected {expected_sha256}, got {sha256}",
+                rest_framework.status.HTTP_400_BAD_REQUEST,
+            )
 
         task = UploadTask.objects.create(
             repo=repo,
@@ -464,6 +491,7 @@ class UploadViewSet(viewsets.ViewSet):
             overwrite=overwrite,
             stored_path=full_stored_filepath,
             sha512=sha512,
+            sha256=sha256,
         )
 
         from repo.tasks import process_upload_task

@@ -19,6 +19,7 @@ class PackageInfo:
     version: str
     relative_path: str          # e.g. "aa/axbpoiergm"
     checksum_sha512: str = ""
+    checksum_sha256: str = ""
     upload_date: Optional[str] = None  # ISO format or None
 
 

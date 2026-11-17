@@ -186,3 +186,40 @@ class ProcessUploadTestCase(TempSettingsMixin, TestCase):
         task.refresh_from_db()
         self.assertEqual(task.status, "failed")
         mock_remove.assert_called_once()
+
+    @patch("repo.api.upload_processor.create_adapter")
+    def test_successful_upload_populates_checksum_sha256(self, mock_create_adapter):
+        """process_upload computes and stores checksum_sha256 on Package and UploadTask"""
+        import hashlib
+
+        mock_create_adapter.return_value = self._mock_adapter()
+        content = b"sha256 test payload"
+        expected_sha256 = hashlib.sha256(content).hexdigest()
+        task = self._make_task(content=content)
+
+        process_upload(task.pk)
+
+        task.refresh_from_db()
+        self.assertEqual(task.status, "completed")
+        self.assertEqual(task.sha256, expected_sha256)
+        pkg = Package.objects.get(repo=self.repo, package_name="mypkg")
+        self.assertEqual(pkg.checksum_sha256, expected_sha256)
+        self.assertEqual(task.result_data["checksum_sha256"], expected_sha256)
+
+    @patch("repo.api.upload_processor.create_adapter")
+    def test_checksum_mismatch_marks_task_failed_and_removes_file(self, mock_create_adapter):
+        """If task.sha256 does not match the stored file, task fails with CHECKSUM_MISMATCH"""
+        mock_create_adapter.return_value = self._mock_adapter()
+        task = self._make_task(content=b"real bytes")
+        task.sha256 = "0" * 64
+        task.save(update_fields=["sha256"])
+        stored_path = task.stored_path
+
+        process_upload(task.pk)
+
+        task.refresh_from_db()
+        self.assertEqual(task.status, "failed")
+        self.assertEqual(task.error_code, "CHECKSUM_MISMATCH")
+        self.assertIn("SHA-256 checksum mismatch", task.error_message)
+        self.assertFalse(os.path.exists(stored_path))
+        self.assertEqual(Package.objects.filter(repo=self.repo).count(), 0)

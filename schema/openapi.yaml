@@ -203,6 +203,10 @@ paths:
         schema:
           type: string
       - in: query
+        name: checksum_sha256
+        schema:
+          type: string
+      - in: query
         name: checksum_sha512
         schema:
           type: string
@@ -557,7 +561,9 @@ paths:
     post:
       operationId: upload_create
       description: Upload a package file. Returns a task ID for async status polling.
-        Returns 409 if the package already exists and overwrite is not set.
+        If `sha256` is provided, the server verifies the uploaded file matches before
+        accepting. Returns 400 on validation or checksum mismatch, and 409 if the
+        package already exists and overwrite is not set.
       parameters:
       - in: path
         name: repo_uid
@@ -581,6 +587,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UploadResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '409':
           content:
@@ -714,7 +726,7 @@ paths:
         name: completion_status
         schema:
           type: string
-          x-spec-enum-id: 3d4790721c6c9fc0
+          x-spec-enum-id: 62ed3fcc49afbbc5
           enum:
           - complete_fail
           - complete_success
@@ -860,7 +872,7 @@ paths:
         name: repo_type
         schema:
           type: string
-          x-spec-enum-id: 80fba3f307cafbc7
+          x-spec-enum-id: a8ff04f980c2ab94
           enum:
           - apk
           - deb
@@ -1995,6 +2007,10 @@ paths:
         schema:
           type: string
       - in: query
+        name: checksum_sha256
+        schema:
+          type: string
+      - in: query
         name: checksum_sha512
         schema:
           type: string
@@ -2349,7 +2365,9 @@ paths:
     post:
       operationId: v1_upload_create
       description: Upload a package file. Returns a task ID for async status polling.
-        Returns 409 if the package already exists and overwrite is not set.
+        If `sha256` is provided, the server verifies the uploaded file matches before
+        accepting. Returns 400 on validation or checksum mismatch, and 409 if the
+        package already exists and overwrite is not set.
       parameters:
       - in: path
         name: repo_uid
@@ -2373,6 +2391,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UploadResponse'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
           description: ''
         '409':
           content:
@@ -2506,7 +2530,7 @@ paths:
         name: completion_status
         schema:
           type: string
-          x-spec-enum-id: 3d4790721c6c9fc0
+          x-spec-enum-id: 62ed3fcc49afbbc5
           enum:
           - complete_fail
           - complete_success
@@ -2672,7 +2696,7 @@ paths:
         name: repo_type
         schema:
           type: string
-          x-spec-enum-id: 80fba3f307cafbc7
+          x-spec-enum-id: a8ff04f980c2ab94
           enum:
           - apk
           - deb
@@ -3704,6 +3728,9 @@ components:
           description: When the build started.
         build_number:
           type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
           description: Sequential build number within the repository.
         completion_status:
           enum:
@@ -3711,7 +3738,7 @@ components:
           - complete_success
           - complete_fail
           type: string
-          x-spec-enum-id: 3d4790721c6c9fc0
+          x-spec-enum-id: 62ed3fcc49afbbc5
           description: |-
             Build result: running, success, or error.
 
@@ -3734,6 +3761,9 @@ components:
       properties:
         build:
           type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
           nullable: true
           description: Build number this log line belongs to.
         timestamp:
@@ -3753,6 +3783,9 @@ components:
           maxLength: 128
         line_number:
           type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
           description: Sequential line number within the build.
         execution_time_sec:
           type: number
@@ -3897,6 +3930,10 @@ components:
           type: string
           description: SHA-512 hash of the package file.
           maxLength: 512
+        checksum_sha256:
+          type: string
+          description: SHA-256 hash of the package file.
+          maxLength: 64
         build_date:
           type: string
           format: date-time
@@ -3950,6 +3987,10 @@ components:
           minLength: 1
           description: SHA-512 hash of the package file.
           maxLength: 512
+        checksum_sha256:
+          type: string
+          description: SHA-256 hash of the package file.
+          maxLength: 64
         build_date:
           type: string
           format: date-time
@@ -4201,6 +4242,10 @@ components:
           minLength: 1
           description: SHA-512 hash of the package file.
           maxLength: 512
+        checksum_sha256:
+          type: string
+          description: SHA-256 hash of the package file.
+          maxLength: 64
         build_date:
           type: string
           format: date-time
@@ -4227,7 +4272,7 @@ components:
           - apk
           - files
           type: string
-          x-spec-enum-id: 80fba3f307cafbc7
+          x-spec-enum-id: a8ff04f980c2ab94
           description: |-
             Package format: deb, rpm, apk, or files.
 
@@ -4237,6 +4282,9 @@ components:
             * `files` - Generic Files
         package_count:
           type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
           description: Number of packages in the repository.
         signing_key:
           type: string
@@ -4250,7 +4298,7 @@ components:
           - max_age_days
           - keep_latest_n_and_age
           type: string
-          x-spec-enum-id: dce96f7a3a5fa66a
+          x-spec-enum-id: 55a7dac8e914aa8e
           description: |-
             Retention strategy (none, keep_latest_n, keep_latest_age, keep_latest_n_and_age).
 
@@ -4260,10 +4308,16 @@ components:
             * `keep_latest_n_and_age` - Keep latest N versions OR delete older than N days
         retention_keep_count:
           type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
           nullable: true
           description: Number of versions to keep (when using keep_latest_n policy).
         retention_max_age_days:
           type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
           nullable: true
           description: Maximum age in days (when using keep_latest_age policy).
         multi_arch:
@@ -4291,7 +4345,7 @@ components:
           - apk
           - files
           type: string
-          x-spec-enum-id: 80fba3f307cafbc7
+          x-spec-enum-id: a8ff04f980c2ab94
           description: |-
             Package format: deb, rpm, apk, or files.
 
@@ -4301,6 +4355,9 @@ components:
             * `files` - Generic Files
         package_count:
           type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
           description: Number of packages in the repository.
         is_stale:
           type: boolean
@@ -4320,11 +4377,14 @@ components:
           title: Superuser status
           description: Whether the user has full admin privileges.
         email:
-          type: string
-          format: email
           title: Email address
           description: Email address.
-          maxLength: 254
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
     RepoDetail:
       type: object
       description: Full repository detail with configuration and instructions.
@@ -4351,7 +4411,7 @@ components:
           - apk
           - files
           type: string
-          x-spec-enum-id: 80fba3f307cafbc7
+          x-spec-enum-id: a8ff04f980c2ab94
           description: |-
             Package format: deb, rpm, apk, or files.
 
@@ -4361,6 +4421,9 @@ components:
             * `files` - Generic Files
         package_count:
           type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
           description: Number of packages in the repository.
         is_stale:
           type: boolean
@@ -4377,7 +4440,7 @@ components:
           - max_age_days
           - keep_latest_n_and_age
           type: string
-          x-spec-enum-id: dce96f7a3a5fa66a
+          x-spec-enum-id: 55a7dac8e914aa8e
           description: |-
             Retention strategy (none, keep_latest_n, keep_latest_age, keep_latest_n_and_age).
 
@@ -4387,10 +4450,16 @@ components:
             * `keep_latest_n_and_age` - Keep latest N versions OR delete older than N days
         retention_keep_count:
           type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
           nullable: true
           description: Number of versions to keep (when using keep_latest_n policy).
         retention_max_age_days:
           type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
           nullable: true
           description: Maximum age in days (when using keep_latest_age policy).
         multi_arch:
@@ -4441,7 +4510,7 @@ components:
           - apk
           - files
           type: string
-          x-spec-enum-id: 80fba3f307cafbc7
+          x-spec-enum-id: a8ff04f980c2ab94
           description: |-
             Package format: deb, rpm, apk, or files.
 
@@ -4451,6 +4520,9 @@ components:
             * `files` - Generic Files
         package_count:
           type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
           description: Number of packages in the repository.
         signing_key:
           type: string
@@ -4464,7 +4536,7 @@ components:
           - max_age_days
           - keep_latest_n_and_age
           type: string
-          x-spec-enum-id: dce96f7a3a5fa66a
+          x-spec-enum-id: 55a7dac8e914aa8e
           description: |-
             Retention strategy (none, keep_latest_n, keep_latest_age, keep_latest_n_and_age).
 
@@ -4474,10 +4546,16 @@ components:
             * `keep_latest_n_and_age` - Keep latest N versions OR delete older than N days
         retention_keep_count:
           type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
           nullable: true
           description: Number of versions to keep (when using keep_latest_n policy).
         retention_max_age_days:
           type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
           nullable: true
           description: Maximum age in days (when using keep_latest_age policy).
         multi_arch:
@@ -4517,7 +4595,7 @@ components:
           - apk
           - files
           type: string
-          x-spec-enum-id: 80fba3f307cafbc7
+          x-spec-enum-id: a8ff04f980c2ab94
           description: |-
             Package format: deb, rpm, apk, or files.
 
@@ -4527,6 +4605,9 @@ components:
             * `files` - Generic Files
         package_count:
           type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
           description: Number of packages in the repository.
         is_stale:
           type: boolean
@@ -4565,7 +4646,7 @@ components:
           - apk
           - files
           type: string
-          x-spec-enum-id: 80fba3f307cafbc7
+          x-spec-enum-id: a8ff04f980c2ab94
           description: |-
             Package format: deb, rpm, apk, or files.
 
@@ -4575,6 +4656,9 @@ components:
             * `files` - Generic Files
         package_count:
           type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
           description: Number of packages in the repository.
         is_stale:
           type: boolean
@@ -4594,6 +4678,11 @@ components:
           type: string
           minLength: 1
           description: Set to "1", "true", or "yes" to overwrite existing.
+        sha256:
+          type: string
+          minLength: 1
+          description: Optional expected SHA-256 hex digest (64 hex chars). Verified
+            on receipt if provided.
       required:
       - package_file
     UploadResponse:
@@ -4629,11 +4718,18 @@ components:
           maxLength: 65536
         filesize:
           type: integer
+          maximum: 9223372036854775807
+          minimum: -9223372036854775808
+          format: int64
           description: File size in bytes.
         sha512:
           type: string
           description: SHA-512 hash of the uploaded file.
           maxLength: 512
+        sha256:
+          type: string
+          description: SHA-256 hash of the uploaded file.
+          maxLength: 64
         error_message:
           type: string
           description: Human-readable error description (empty on success).
@@ -4677,11 +4773,14 @@ components:
           title: Superuser status
           description: Whether the user has full admin privileges.
         email:
-          type: string
-          format: email
           title: Email address
           description: Email address.
-          maxLength: 254
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
       required:
       - href
       - username
@@ -4703,11 +4802,14 @@ components:
           title: Superuser status
           description: Whether the user has full admin privileges.
         email:
-          type: string
-          format: email
           title: Email address
           description: Email address.
-          maxLength: 254
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
         api_key:
           type: string
           readOnly: true
@@ -4731,11 +4833,14 @@ components:
           title: Superuser status
           description: Whether the user has full admin privileges.
         email:
-          type: string
-          format: email
           title: Email address
           description: Email address.
-          maxLength: 254
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
       required:
       - username
   securitySchemes:

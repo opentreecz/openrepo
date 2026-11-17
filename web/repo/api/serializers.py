@@ -264,6 +264,7 @@ class PackageDetailSerializer(serializers.HyperlinkedModelSerializer):
             "version",
             "architecture",
             "checksum_sha512",
+            "checksum_sha256",
             "build_date",
             "upload_date",
         ]
@@ -274,6 +275,7 @@ class PackageDetailSerializer(serializers.HyperlinkedModelSerializer):
             "version": {"help_text": "Package version string."},
             "architecture": {"help_text": "Target architecture (e.g. amd64, arm64, all)."},
             "checksum_sha512": {"help_text": "SHA-512 hash of the package file."},
+            "checksum_sha256": {"help_text": "SHA-256 hash of the package file."},
             "build_date": {"help_text": "When the package was built (from package metadata)."},
             "upload_date": {"help_text": "When the package was uploaded to OpenRepo."},
         }
@@ -293,9 +295,13 @@ class UploadSerializer(serializers.Serializer):
 
     package_file = serializers.FileField(help_text="The package file to upload (.deb, .rpm, or any file).")
     overwrite = serializers.CharField(required=False, help_text='Set to "1", "true", or "yes" to overwrite existing.')
+    sha256 = serializers.CharField(
+        required=False,
+        help_text="Optional expected SHA-256 hex digest (64 hex chars). Verified on receipt if provided.",
+    )
 
     class Meta:
-        fields = ["package_file", "overwrite"]
+        fields = ["package_file", "overwrite", "sha256"]
 
 
 class UploadResponseSerializer(serializers.Serializer):
@@ -333,6 +339,7 @@ class UploadTaskSerializer(serializers.ModelSerializer):
             "filename",
             "filesize",
             "sha512",
+            "sha256",
             "error_message",
             "error_code",
             "result_data",
@@ -345,6 +352,7 @@ class UploadTaskSerializer(serializers.ModelSerializer):
             "filename": {"help_text": "Original uploaded filename."},
             "filesize": {"help_text": "File size in bytes."},
             "sha512": {"help_text": "SHA-512 hash of the uploaded file."},
+            "sha256": {"help_text": "SHA-256 hash of the uploaded file."},
             "error_message": {"help_text": "Human-readable error description (empty on success)."},
             "error_code": {"help_text": "Machine-readable error code (e.g. PACKAGE_EXISTS)."},
             "result_data": {"help_text": "Parsed package metadata on success (JSON object)."},

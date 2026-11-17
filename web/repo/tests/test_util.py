@@ -5,7 +5,7 @@ import tempfile
 
 from django.test import TestCase
 
-from repo.api.util import compute_sha512, reduce_to_uid
+from repo.api.util import compute_sha256, compute_sha512, reduce_to_uid
 
 
 class UtilTestCase(TestCase):
@@ -73,6 +73,54 @@ class UtilTestCase(TestCase):
         try:
             result = compute_sha512(tmp_path)
             self.assertEqual(len(result), 128)
+            int(result, 16)  # should not raise
+        finally:
+            os.unlink(tmp_path)
+
+    def test_compute_sha256_known_value(self):
+        """compute_sha256 returns correct hex digest"""
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(b"hello world")
+            tmp_path = tmp.name
+        try:
+            result = compute_sha256(tmp_path)
+            expected = hashlib.sha256(b"hello world").hexdigest()
+            self.assertEqual(result, expected)
+        finally:
+            os.unlink(tmp_path)
+
+    def test_compute_sha256_empty_file(self):
+        """compute_sha256 of empty file matches sha256 of empty string"""
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp_path = tmp.name
+        try:
+            result = compute_sha256(tmp_path)
+            expected = hashlib.sha256(b"").hexdigest()
+            self.assertEqual(result, expected)
+        finally:
+            os.unlink(tmp_path)
+
+    def test_compute_sha256_large_file(self):
+        """compute_sha256 works on multi-chunk files (> 64KB)"""
+        data = b"y" * (1024 * 128)  # 128 KB
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(data)
+            tmp_path = tmp.name
+        try:
+            result = compute_sha256(tmp_path)
+            expected = hashlib.sha256(data).hexdigest()
+            self.assertEqual(result, expected)
+        finally:
+            os.unlink(tmp_path)
+
+    def test_compute_sha256_returns_hex_string(self):
+        """compute_sha256 returns a 64-char hex string"""
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(b"test")
+            tmp_path = tmp.name
+        try:
+            result = compute_sha256(tmp_path)
+            self.assertEqual(len(result), 64)
             int(result, 16)  # should not raise
         finally:
             os.unlink(tmp_path)

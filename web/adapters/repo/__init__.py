@@ -47,6 +47,7 @@ def get_repo_adapter(repo_obj):
             version=p.version,
             relative_path=p.relative_path(),
             checksum_sha512=p.checksum_sha512,
+            checksum_sha256=p.checksum_sha256,
             upload_date=p.upload_date.isoformat() if p.upload_date else None,
         )
         for p in Package.objects.filter(repo__repo_uid=repo_obj.repo_uid)

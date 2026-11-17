@@ -767,7 +767,7 @@ class PatchSupportTestCase(APITestCase):
 
 
 class UploadTaskSerializerFieldsTestCase(APITestCase):
-    """Test that UploadTaskSerializer includes repo_uid and sha512."""
+    """Test that UploadTaskSerializer includes repo_uid, sha512, and sha256."""
 
     def setUp(self):
         self.admin, self.admin_token, self.auth = make_admin("field_admin")
@@ -781,6 +781,7 @@ class UploadTaskSerializerFieldsTestCase(APITestCase):
         self.task = UploadTask.objects.create(
             repo=self.repo, status="completed", filename="test.deb",
             filesize=100, stored_path="/tmp/fake", sha512="abc123hash",
+            sha256="def456sha256",
         )
 
     def test_upload_status_includes_repo_uid(self):
@@ -800,3 +801,130 @@ class UploadTaskSerializerFieldsTestCase(APITestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["sha512"], "abc123hash")
+
+    def test_upload_status_includes_sha256(self):
+        """Upload status response includes sha256 field."""
+        response = self.client.get(
+            f"/api/upload-status/{self.task.pk}/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["sha256"], "def456sha256")
+
+
+class UploadHashContinuityTestCase(TempSettingsMixin, APITestCase):
+    """Tests for Phase 4.6 SHA-256 hash continuity on upload and package endpoints."""
+
+    def setUp(self):
+        super().setUp()
+        self.admin, self.admin_token, self.auth = make_admin("hash_admin")
+        self.signing_key = make_signing_key(
+            name="HashKey", email="hash@example.com", fingerprint="HASH_FP_12345678",
+        )
+        self.repo = Repository.objects.create(
+            repo_uid="hash-repo", repo_type="files", signing_key=self.signing_key,
+        )
+
+    @patch("repo.tasks.process_upload_task.delay")
+    def test_upload_with_matching_sha256_accepted(self, mock_delay):
+        """Upload with matching SHA-256 returns 202 and records sha256 on UploadTask."""
+        import hashlib
+
+        payload = b"package-bytes-for-sha256"
+        expected_sha256 = hashlib.sha256(payload).hexdigest()
+        uploaded = SimpleUploadedFile("pkg-1.0.0.bin", payload, content_type="application/octet-stream")
+
+        response = self.client.post(
+            f"/api/{self.repo.repo_uid}/upload/",
+            {"package_file": uploaded, "sha256": expected_sha256},
+            format="multipart",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        task_id = response.data["task_id"]
+        task = UploadTask.objects.get(pk=task_id)
+        self.assertEqual(task.sha256, expected_sha256)
+        mock_delay.assert_called_once_with(str(task.pk))
+
+    @patch("repo.tasks.process_upload_task.delay")
+    def test_upload_with_uppercase_sha256_normalized_and_accepted(self, mock_delay):
+        """Upload with uppercase/padded SHA-256 normalizes and accepts."""
+        import hashlib
+
+        payload = b"uppercase-sha256-payload"
+        expected_sha256 = hashlib.sha256(payload).hexdigest()
+        uploaded = SimpleUploadedFile("pkg-1.0.0.bin", payload, content_type="application/octet-stream")
+
+        response = self.client.post(
+            f"/api/{self.repo.repo_uid}/upload/",
+            {"package_file": uploaded, "sha256": f"  {expected_sha256.upper()}  "},
+            format="multipart",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+
+    @patch("repo.tasks.process_upload_task.delay")
+    def test_upload_with_mismatched_sha256_rejected_400(self, mock_delay):
+        """Upload with wrong SHA-256 returns 400 CHECKSUM_MISMATCH and creates no task."""
+        payload = b"actual-package-bytes"
+        wrong_sha256 = "a" * 64
+        uploaded = SimpleUploadedFile("pkg-1.0.0.bin", payload, content_type="application/octet-stream")
+
+        response = self.client.post(
+            f"/api/{self.repo.repo_uid}/upload/",
+            {"package_file": uploaded, "sha256": wrong_sha256},
+            format="multipart",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["code"], "CHECKSUM_MISMATCH")
+        self.assertIn("SHA-256 checksum mismatch", response.data["detail"])
+        self.assertEqual(UploadTask.objects.filter(repo=self.repo).count(), 0)
+        mock_delay.assert_not_called()
+
+    @patch("repo.tasks.process_upload_task.delay")
+    def test_upload_with_invalid_sha256_format_rejected_400(self, mock_delay):
+        """Upload with non-hex or wrong-length sha256 returns 400 VALIDATION_ERROR."""
+        uploaded = SimpleUploadedFile("pkg-1.0.0.bin", b"bytes", content_type="application/octet-stream")
+
+        response = self.client.post(
+            f"/api/{self.repo.repo_uid}/upload/",
+            {"package_file": uploaded, "sha256": "not-a-valid-sha256"},
+            format="multipart",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["code"], "VALIDATION_ERROR")
+        self.assertEqual(UploadTask.objects.filter(repo=self.repo).count(), 0)
+        mock_delay.assert_not_called()
+
+    def test_package_detail_and_filter_by_checksum_sha256(self):
+        """Package detail exposes checksum_sha256 and package list filters by checksum_sha256."""
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        sha256_val = "b" * 64
+        pkg = Package.objects.create(
+            repo=self.repo,
+            package_uid="hash-pkg-1",
+            filename="pkg-1.0.bin",
+            package_name="pkg",
+            version="1.0",
+            architecture="any",
+            upload_date=now,
+            checksum_sha512="c" * 128,
+            checksum_sha256=sha256_val,
+        )
+
+        detail_resp = self.client.get(
+            f"/api/{self.repo.repo_uid}/pkg/{pkg.package_uid}/",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(detail_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_resp.data["checksum_sha256"], sha256_val)
+
+        list_resp = self.client.get(
+            f"/api/{self.repo.repo_uid}/packages/?checksum_sha256={sha256_val}",
+            HTTP_AUTHORIZATION=f"Token {self.admin_token}",
+        )
+        self.assertEqual(list_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(list_resp.data["count"], 1)
+        self.assertEqual(list_resp.data["results"][0]["package_uid"], "hash-pkg-1")
