@@ -97,6 +97,7 @@ Default credentials:
 | `OPENREPO_WORKER_BEAT` | `1` | `manage.py runworker` embeds Celery Beat; set `0` when a separate beat runs |
 | `OPENREPO_BROKER_CONNECTION_TIMEOUT` | `5` | Seconds to wait for the broker before uploads fall back to in-process handling |
 | `OPENREPO_BROKER_PUBLISH_RETRIES` | `2` | Task publish retries before falling back |
+| `OPENREPO_REBUILD_QUEUED_TTL` | `300` | Seconds a queued rebuild suppresses duplicate dispatches for the same repo |
 | `OPENREPO_IMAGE` | `ghcr.io/opentreecz/openrepo:latest` | Compose image for nginx/django/worker/beat |
 | `OPENREPO_CELERY_EAGER` | `0` | Set `1` for synchronous tasks in development/tests only |
 | `OPENREPO_DISABLE_THROTTLE` | `0` | Set `1` to disable API throttling in development/tests |

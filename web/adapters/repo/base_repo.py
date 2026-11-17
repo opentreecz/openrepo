@@ -338,9 +338,13 @@ class BaseRepoAdapter:
             if success:
                 with self._buildlog_section(f"Updating repo symlink to point to {dirname}"):
                     repo_uid_symlink = os.path.join(self.config.repo_www_path, self.repo_uid)
-                    if os.path.exists(repo_uid_symlink):
-                        os.unlink(repo_uid_symlink)
-                    os.symlink(dirname, repo_uid_symlink)
+                    # Atomic swap: create the new link beside the old one and
+                    # rename over it, so clients never see a missing repo.
+                    tmp_symlink = f"{repo_uid_symlink}.tmp-{os.getpid()}"
+                    if os.path.lexists(tmp_symlink):
+                        os.unlink(tmp_symlink)
+                    os.symlink(dirname, tmp_symlink)
+                    os.replace(tmp_symlink, repo_uid_symlink)
 
                 with self._buildlog_section(f"Cleaning old directories in {self.config.repo_www_path}"):
                     self._clean_old_dirs(dirname)

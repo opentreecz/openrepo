@@ -67,12 +67,8 @@ def flag_repo_as_stale(sender, instance, using, **kwargs):
     try:
         from django.conf import settings as _settings
         if not getattr(_settings, "CELERY_TASK_ALWAYS_EAGER", False):
-            from repo.tasks import rebuild_repo_task
-            rebuild_repo_task.apply_async(
-                args=[repo.repo_uid],
-                task_id=f"rebuild-{repo.repo_uid}",
-                countdown=2,
-            )
+            from repo.tasks import enqueue_rebuild
+            enqueue_rebuild(repo.repo_uid, countdown=2)
     except Exception:
         # If Celery/Redis is unavailable, the periodic check_stale_repos
         # task will pick up the is_stale flag as a fallback.

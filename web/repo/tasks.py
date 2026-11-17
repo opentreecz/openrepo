@@ -61,27 +61,71 @@ def process_upload_task(self, task_id):
     process_upload(task_id)
 
 
+def enqueue_rebuild(repo_uid, countdown=0):
+    """Dispatch a rebuild of *repo_uid* unless one is already queued.
+
+    Returns ``True`` if a task was dispatched.  Duplicate dispatches are
+    cheap anyway (the task skips when the repo is already being rebuilt),
+    but de-duplicating here keeps the queue from filling with redundant
+    rebuilds that delay upload processing.
+    """
+    from repo.locks import clear_rebuild_queued, mark_rebuild_queued
+
+    if not mark_rebuild_queued(repo_uid):
+        return False
+    try:
+        rebuild_repo_task.apply_async(
+            args=[repo_uid],
+            task_id=f"rebuild-{repo_uid}",
+            countdown=countdown,
+        )
+    except Exception:
+        clear_rebuild_queued(repo_uid)
+        raise
+    return True
+
+
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def rebuild_repo_task(self, repo_uid):
     """Rebuild repository metadata.
 
-    Replaces: ``BackgroundWorker.run()`` logic in ``bgworker.py``.
-    Deduplication: use ``task_id=f"rebuild-{repo_uid}"`` when dispatching
-    to prevent concurrent rebuilds of the same repo.
+    Only one rebuild per repo runs at a time (``repo.locks``).  If another
+    rebuild is in progress this task exits immediately; the repo keeps its
+    ``is_stale`` flag and ``check_stale_repos`` dispatches a fresh rebuild
+    once the running one has finished.
     """
     close_old_connections()
     from adapters.repo.orchestrator import build_repo
+    from repo.locks import clear_rebuild_queued, repo_build_lock
     from repo.models import Repository
 
-    try:
-        success = build_repo(repo_uid)
-        if success:
-            Repository.objects.filter(repo_uid=repo_uid).update(is_stale=False)
-        else:
-            logger.warning("Repo rebuild failed for '%s'", repo_uid)
-            raise self.retry(exc=RuntimeError(f"Repo build failed: {repo_uid}"))
-    except Repository.DoesNotExist:
-        logger.info("Repo '%s' was deleted before rebuild. Skipping.", repo_uid)
+    clear_rebuild_queued(repo_uid)
+    with repo_build_lock(repo_uid) as acquired:
+        if not acquired:
+            logger.info("Rebuild of '%s' already in progress; skipping duplicate", repo_uid)
+            return
+        if not Repository.objects.filter(repo_uid=repo_uid).exists():
+            logger.info("Repo '%s' was deleted before rebuild. Skipping.", repo_uid)
+            return
+        # Clear the flag *before* building: packages added while the build
+        # runs set it again, so their changes trigger another rebuild.
+        Repository.objects.filter(repo_uid=repo_uid).update(is_stale=False)
+        try:
+            success = build_repo(repo_uid)
+        except Repository.DoesNotExist:
+            logger.info("Repo '%s' was deleted before rebuild. Skipping.", repo_uid)
+            return
+        except Exception:
+            logger.exception("Repo rebuild crashed for '%s'", repo_uid)
+            success = False
+
+    if not success:
+        logger.warning("Repo rebuild failed for '%s'", repo_uid)
+        if self.request.retries >= self.max_retries:
+            # Give up for now; leave it stale so a later pass retries.
+            Repository.objects.filter(repo_uid=repo_uid).update(is_stale=True)
+            return
+        raise self.retry(exc=RuntimeError(f"Repo build failed: {repo_uid}"))
 
 
 @shared_task
@@ -118,8 +162,9 @@ def check_stale_repos():
     stale_repos = Repository.objects.filter(is_stale=True).values_list(
         "repo_uid", flat=True
     )
+    from repo.locks import is_build_running
+
     for repo_uid in stale_repos:
-        rebuild_repo_task.apply_async(
-            args=[repo_uid],
-            task_id=f"rebuild-{repo_uid}",
-        )
+        if is_build_running(repo_uid):
+            continue
+        enqueue_rebuild(repo_uid)

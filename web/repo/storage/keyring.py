@@ -21,6 +21,20 @@ from django.conf import settings
 from repo.models import PGPSigningKey
 
 
+def ensure_keyring_dir() -> None:
+    """Create KEYRING_PATH with owner-only permissions (0700).
+
+    GnuPG warns "unsafe permissions on homedir" when the directory is
+    group/world accessible; existing directories are tightened too.
+    """
+    os.makedirs(settings.KEYRING_PATH, mode=0o700, exist_ok=True)
+    try:
+        if os.stat(settings.KEYRING_PATH).st_mode & 0o077:
+            os.chmod(settings.KEYRING_PATH, 0o700)
+    except OSError:
+        pass
+
+
 def _init_gpg() -> gnupg.GPG:
     """Create and return a configured gnupg.GPG instance.
 
@@ -28,8 +42,7 @@ def _init_gpg() -> gnupg.GPG:
     backport quirk where the ``gnupghome`` kwarg may raise ``TypeError``
     on older versions (falls back to ``homedir``).
     """
-    if not os.path.isdir(settings.KEYRING_PATH):
-        os.makedirs(settings.KEYRING_PATH)
+    ensure_keyring_dir()
 
     # Weird backport behavior with arguments
     # https://stackoverflow.com/questions/35028852/how-to-set-the-gnupg-home-directory-within-the-gnupg-python-binding

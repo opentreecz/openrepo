@@ -80,6 +80,34 @@ class RebuildRepoTaskTest(TempSettingsMixin, TestCase):
         self.repo.refresh_from_db()
         self.assertFalse(self.repo.is_stale)
 
+    @patch("adapters.repo.orchestrator.build_repo")
+    def test_rebuild_skips_when_already_running(self, mock_build):
+        """A second rebuild of the same repo exits without building."""
+        from repo.locks import repo_build_lock
+        from repo.tasks import rebuild_repo_task
+        with repo_build_lock(self.repo.repo_uid) as acquired:
+            self.assertTrue(acquired)
+            rebuild_repo_task(self.repo.repo_uid)
+        mock_build.assert_not_called()
+        self.repo.refresh_from_db()
+        self.assertTrue(self.repo.is_stale)
+
+    @patch("adapters.repo.orchestrator.build_repo", return_value=True)
+    def test_rebuild_clears_stale_before_building(self, mock_build):
+        """is_stale is cleared before the build so concurrent changes re-flag it."""
+        from repo.tasks import rebuild_repo_task
+
+        def build(uid):
+            # Simulate a package arriving during the build.
+            self.assertFalse(Repository.objects.get(repo_uid=uid).is_stale)
+            Repository.objects.filter(repo_uid=uid).update(is_stale=True)
+            return True
+
+        mock_build.side_effect = build
+        rebuild_repo_task(self.repo.repo_uid)
+        self.repo.refresh_from_db()
+        self.assertTrue(self.repo.is_stale)
+
     def test_rebuild_handles_deleted_repo(self):
         """rebuild_repo_task exits cleanly if the repo was deleted."""
         from repo.tasks import rebuild_repo_task
@@ -113,6 +141,12 @@ class RetentionSweepTaskTest(TestCase):
 class CheckStaleReposTaskTest(TestCase):
     """Tests for the check_stale_repos Celery task."""
 
+    def setUp(self):
+        super().setUp()
+        from repo.locks import clear_rebuild_queued
+        for uid in ("stale-check-repo", "busy-repo"):
+            clear_rebuild_queued(uid)
+
     def test_dispatches_rebuild_for_stale_repos(self):
         """check_stale_repos dispatches rebuild_repo_task for each stale repo."""
         key = make_signing_key(name="Stale Key", fingerprint="STALE_FP_1")
@@ -125,7 +159,31 @@ class CheckStaleReposTaskTest(TestCase):
             mock_apply.assert_called_once_with(
                 args=["stale-check-repo"],
                 task_id="rebuild-stale-check-repo",
+                countdown=0,
             )
+            # A second pass while the rebuild is still queued does not re-dispatch.
+            check_stale_repos()
+            mock_apply.assert_called_once()
+
+    def test_skips_repo_whose_rebuild_is_running(self):
+        """check_stale_repos does not queue a rebuild while one holds the lock."""
+        from repo.locks import repo_build_lock
+        key = make_signing_key(name="Busy Key", fingerprint="BUSY_FP_1")
+        Repository.objects.create(
+            repo_uid="busy-repo", repo_type="files", signing_key=key, is_stale=True,
+        )
+        with patch("repo.tasks.rebuild_repo_task.apply_async") as mock_apply:
+            from repo.tasks import check_stale_repos
+            with repo_build_lock("busy-repo") as acquired:
+                self.assertTrue(acquired)
+                check_stale_repos()
+            mock_apply.assert_not_called()
+
+    def tearDown(self):
+        from repo.locks import clear_rebuild_queued
+        for uid in ("stale-check-repo", "busy-repo"):
+            clear_rebuild_queued(uid)
+        super().tearDown()
 
     def test_does_nothing_when_no_stale_repos(self):
         """check_stale_repos does nothing when all repos are up to date."""
@@ -184,3 +242,39 @@ class OrchestratorTest(TempSettingsMixin, TestCase):
         from adapters.repo.orchestrator import build_repo
         with self.assertRaises(Repository.DoesNotExist):
             build_repo("nonexistent-repo-uid")
+
+
+class RepoBuildLockTest(TestCase):
+    """repo.locks: exclusive per-repo rebuild lock and queued markers."""
+
+    def test_lock_is_exclusive(self):
+        from repo.locks import is_build_running, repo_build_lock
+        self.assertFalse(is_build_running("lock-test"))
+        with repo_build_lock("lock-test") as first:
+            self.assertTrue(first)
+            self.assertTrue(is_build_running("lock-test"))
+            with repo_build_lock("lock-test") as second:
+                self.assertFalse(second)
+        self.assertFalse(is_build_running("lock-test"))
+
+    def test_queued_marker_dedupes(self):
+        from repo.locks import clear_rebuild_queued, mark_rebuild_queued
+        clear_rebuild_queued("queue-test")
+        self.assertTrue(mark_rebuild_queued("queue-test"))
+        self.assertFalse(mark_rebuild_queued("queue-test"))
+        clear_rebuild_queued("queue-test")
+        self.assertTrue(mark_rebuild_queued("queue-test"))
+        clear_rebuild_queued("queue-test")
+
+
+class KeyringPermissionsTest(TempSettingsMixin, TestCase):
+    """The GPG homedir is created/tightened to 0700."""
+
+    def test_keyring_dir_is_private(self):
+        import stat
+        from repo.storage.keyring import ensure_keyring_dir
+        os.makedirs(settings.KEYRING_PATH, exist_ok=True)
+        os.chmod(settings.KEYRING_PATH, 0o755)
+        ensure_keyring_dir()
+        mode = stat.S_IMODE(os.stat(settings.KEYRING_PATH).st_mode)
+        self.assertEqual(mode, 0o700)
