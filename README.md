@@ -93,6 +93,11 @@ Default credentials:
 | `OPENREPO_MAX_UPLOAD_SIZE` | `2147483648` | Maximum upload file size in bytes (default 2 GB) |
 | `OPENREPO_PORT` | `7376` | Compose host port for the web UI |
 | `OPENREPO_REDIS_URL` | `redis://redis:6379/0` | Celery broker and result backend; required for queued uploads and rebuilds |
+| `OPENREPO_WORKER_CONCURRENCY` | `4` | Compose worker concurrency |
+| `OPENREPO_WORKER_BEAT` | `1` | `manage.py runworker` embeds Celery Beat; set `0` when a separate beat runs |
+| `OPENREPO_BROKER_CONNECTION_TIMEOUT` | `5` | Seconds to wait for the broker before uploads fall back to in-process handling |
+| `OPENREPO_BROKER_PUBLISH_RETRIES` | `2` | Task publish retries before falling back |
+| `OPENREPO_IMAGE` | `ghcr.io/opentreecz/openrepo:latest` | Compose image for nginx/django/worker/beat |
 | `OPENREPO_CELERY_EAGER` | `0` | Set `1` for synchronous tasks in development/tests only |
 | `OPENREPO_DISABLE_THROTTLE` | `0` | Set `1` to disable API throttling in development/tests |
 | `OPENREPO_USE_PYTHON_TOOLS` | `0` | Set `1` to use pure-Python Debian/RPM repository tooling |
@@ -439,6 +444,19 @@ We welcome contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 - Coding standards and testing requirements
 - Submitting pull requests
 - Reporting issues
+
+
+### Troubleshooting: worker restarts with "The module openrepo was not found"
+
+Older Compose files started the worker with `./django/manage.py runworker`
+from `/app`, so Celery could not import the `openrepo` app. Since 2.10.0
+`runworker` always runs Celery from the Django project directory, and the
+supplied `docker-compose.yml` runs `celery -A openrepo worker` with
+`working_dir: /app/django`. Uploads failing with HTTP 500 usually mean the
+Celery broker was unreachable — make sure your Compose file contains the
+`redis` service and sets `OPENREPO_REDIS_URL` for django, worker and beat
+(copy the current `docker-compose.yml`; every setting there can be overridden
+from `.env`).
 
 ## License
 

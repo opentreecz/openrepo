@@ -26,6 +26,33 @@ class ProcessUploadTaskTest(TestCase):
         mock_process.assert_called_once_with("some-uuid-string")
 
 
+class DispatchUploadProcessingTest(TestCase):
+    """dispatch_upload_processing falls back to a thread when the broker is down."""
+
+    @patch("repo.tasks.process_upload_task.delay")
+    def test_uses_celery_when_broker_available(self, mock_delay):
+        from repo.tasks import dispatch_upload_processing
+        self.assertEqual(dispatch_upload_processing("abc"), "celery")
+        mock_delay.assert_called_once_with("abc")
+
+    @patch("repo.tasks.threading.Thread")
+    @patch("repo.tasks.process_upload_task.delay", side_effect=OSError("Connection refused"))
+    def test_falls_back_to_thread_when_broker_down(self, _mock_delay, mock_thread):
+        from repo.tasks import dispatch_upload_processing, _process_upload_in_thread
+        self.assertEqual(dispatch_upload_processing("abc"), "thread")
+        mock_thread.assert_called_once()
+        kwargs = mock_thread.call_args.kwargs
+        self.assertIs(kwargs["target"], _process_upload_in_thread)
+        self.assertEqual(kwargs["args"], ("abc",))
+        mock_thread.return_value.start.assert_called_once()
+
+    @patch("repo.api.upload_processor.process_upload")
+    def test_thread_target_runs_processor(self, mock_process):
+        from repo.tasks import _process_upload_in_thread
+        _process_upload_in_thread("abc")
+        mock_process.assert_called_once_with("abc")
+
+
 class RebuildRepoTaskTest(TempSettingsMixin, TestCase):
     """Tests for the rebuild_repo_task Celery task."""
 

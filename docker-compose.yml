@@ -12,10 +12,37 @@
 #   nginx (8080)  -->  django/gunicorn (8000)  -->  db/postgres (5432)
 #                                               <--  worker (background)
 #
-# All three app containers (nginx, django, worker) use the same Docker
-# image with different commands.  The shared data volume at
+# All app containers (nginx, django, worker, beat) use the same Docker
+# image with different commands.
+#
+# Every ${VAR:-default} below has a working default.  Override any of them
+# in .env (see .env.example) — values in .env always win over the defaults.  The shared data volume at
 # /var/lib/openrepo holds packages, repo metadata, and GPG keyrings.
 # =============================================================================
+
+# Shared environment for django, worker and beat.  Each value defaults to the
+# shown fallback and can be overridden in .env.
+x-openrepo-env: &openrepo-env
+  OPENREPO_DB_TYPE: ${OPENREPO_DB_TYPE:-postgresql}
+  OPENREPO_PG_DATABASE: ${OPENREPO_PG_DATABASE:-openrepo}
+  OPENREPO_PG_USERNAME: ${OPENREPO_PG_USERNAME:-postgres}
+  OPENREPO_PG_PASSWORD: ${OPENREPO_PG_PASSWORD:-postgres}
+  OPENREPO_PG_HOSTNAME: ${OPENREPO_PG_HOSTNAME:-db}
+  OPENREPO_PG_PORT: ${OPENREPO_PG_PORT:-5432}
+  OPENREPO_PG_CONN_MAX_AGE: ${OPENREPO_PG_CONN_MAX_AGE:-300}
+  # REQUIRED — server refuses to start without this.
+  OPENREPO_SECRET_KEY: ${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
+  # Celery broker/result backend.  Must point at a reachable Redis.
+  OPENREPO_REDIS_URL: ${OPENREPO_REDIS_URL:-redis://redis:6379/0}
+  OPENREPO_DEBUG: ${OPENREPO_DEBUG:-FALSE}
+  OPENREPO_DOMAIN: ${OPENREPO_DOMAIN:-localhost:8080}
+  OPENREPO_ALLOWED_HOSTS: ${OPENREPO_ALLOWED_HOSTS:-}
+  OPENREPO_CSRF_TRUSTED_ORIGINS: ${OPENREPO_CSRF_TRUSTED_ORIGINS:-}
+  OPENREPO_MAX_UPLOAD_SIZE: ${OPENREPO_MAX_UPLOAD_SIZE:-2147483648}
+  OPENREPO_LOGLEVEL: ${OPENREPO_LOGLEVEL:-INFO}
+  OPENREPO_DISABLE_THROTTLE: ${OPENREPO_DISABLE_THROTTLE:-0}
+  OPENREPO_USE_PYTHON_TOOLS: ${OPENREPO_USE_PYTHON_TOOLS:-0}
+  RPM_VERSION_IGNORE_BUILD_NUM: ${RPM_VERSION_IGNORE_BUILD_NUM:-false}
 
 services:
 
@@ -24,7 +51,7 @@ services:
   # ---------------------------------------------------------------------------
   nginx:
     build: .
-    image: ghcr.io/opentreecz/openrepo:latest
+    image: ${OPENREPO_IMAGE:-ghcr.io/opentreecz/openrepo:latest}
     command: nginx
     restart: unless-stopped
     ports:
@@ -45,7 +72,7 @@ services:
   # ---------------------------------------------------------------------------
   django:
     build: .
-    image: ghcr.io/opentreecz/openrepo:latest
+    image: ${OPENREPO_IMAGE:-ghcr.io/opentreecz/openrepo:latest}
     expose:
       - "8000"
     command: run_openrepoweb
@@ -53,22 +80,7 @@ services:
     volumes:
       - openrepo-data:/var/lib/openrepo
     environment:
-      - OPENREPO_DB_TYPE=postgresql
-      - OPENREPO_PG_DATABASE=${OPENREPO_PG_DATABASE:-openrepo}
-      - OPENREPO_PG_USERNAME=${OPENREPO_PG_USERNAME:-postgres}
-      - OPENREPO_PG_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
-      - OPENREPO_PG_HOSTNAME=db
-      - OPENREPO_PG_PORT=5432
-      # REQUIRED — server refuses to start without this.
-      - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
-      - OPENREPO_REDIS_URL=redis://redis:6379/0
-      # Optional overrides (uncomment to customize):
-      # - OPENREPO_DEBUG=FALSE
-      # - OPENREPO_DOMAIN=repo.example.com
-      # - OPENREPO_ALLOWED_HOSTS=repo.example.com,repo-internal
-      # - OPENREPO_CSRF_TRUSTED_ORIGINS=https://repo.example.com
-      # - OPENREPO_MAX_UPLOAD_SIZE=2147483648
-      # - OPENREPO_LOGLEVEL=INFO
+      <<: *openrepo-env
     depends_on:
       db:
         condition: service_healthy
@@ -82,54 +94,43 @@ services:
       start_period: 30s
 
   # ---------------------------------------------------------------------------
-  # Worker — background process for repo rebuilds and retention policy sweeps
+  # Worker — Celery worker: upload processing, repo rebuilds, retention sweeps
   # ---------------------------------------------------------------------------
   worker:
     build: .
-    image: ghcr.io/opentreecz/openrepo:latest
-    command: celery -A openrepo worker -l info --concurrency=4
+    image: ${OPENREPO_IMAGE:-ghcr.io/opentreecz/openrepo:latest}
+    # Run from /app/django so the "openrepo" Celery app module is importable.
     working_dir: /app/django
+    command: ["sh", "-c", "exec celery -A openrepo worker -l \"$${OPENREPO_LOGLEVEL:-INFO}\" --concurrency=\"$${OPENREPO_WORKER_CONCURRENCY:-4}\""]
     restart: unless-stopped
     volumes:
       - openrepo-data:/var/lib/openrepo
     environment:
-      - OPENREPO_DB_TYPE=postgresql
-      - OPENREPO_PG_DATABASE=${OPENREPO_PG_DATABASE:-openrepo}
-      - OPENREPO_PG_USERNAME=${OPENREPO_PG_USERNAME:-postgres}
-      - OPENREPO_PG_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
-      - OPENREPO_PG_HOSTNAME=db
-      - OPENREPO_PG_PORT=5432
-      - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
-      - OPENREPO_REDIS_URL=redis://redis:6379/0
+      <<: *openrepo-env
+      OPENREPO_WORKER_CONCURRENCY: ${OPENREPO_WORKER_CONCURRENCY:-4}
     depends_on:
       django:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "cd /app/django && celery -A openrepo inspect ping 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "cd /app/django && celery -A openrepo inspect ping >/dev/null 2>&1 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 30s
 
   # ---------------------------------------------------------------------------
   # Beat — periodic task scheduler (retention sweeps, stale repo polling)
   # ---------------------------------------------------------------------------
   beat:
     build: .
-    image: ghcr.io/opentreecz/openrepo:latest
-    command: celery -A openrepo beat -l info --schedule=/tmp/celerybeat-schedule
+    image: ${OPENREPO_IMAGE:-ghcr.io/opentreecz/openrepo:latest}
     working_dir: /app/django
+    command: ["sh", "-c", "exec celery -A openrepo beat -l \"$${OPENREPO_LOGLEVEL:-INFO}\" --schedule=/tmp/celerybeat-schedule"]
     restart: unless-stopped
     environment:
-      - OPENREPO_DB_TYPE=postgresql
-      - OPENREPO_PG_DATABASE=${OPENREPO_PG_DATABASE:-openrepo}
-      - OPENREPO_PG_USERNAME=${OPENREPO_PG_USERNAME:-postgres}
-      - OPENREPO_PG_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
-      - OPENREPO_PG_HOSTNAME=db
-      - OPENREPO_PG_PORT=5432
-      - OPENREPO_SECRET_KEY=${OPENREPO_SECRET_KEY:-${DJANGO_SECRET_KEY:-}}
-      - OPENREPO_REDIS_URL=redis://redis:6379/0
+      <<: *openrepo-env
     depends_on:
       redis:
         condition: service_healthy
@@ -138,7 +139,7 @@ services:
   # Redis — message broker for Celery task queue
   # ---------------------------------------------------------------------------
   redis:
-    image: redis:7-alpine
+    image: ${OPENREPO_REDIS_IMAGE:-redis:7-alpine}
     restart: unless-stopped
     expose:
       - "6379"
@@ -152,14 +153,14 @@ services:
   # PostgreSQL — relational database
   # ---------------------------------------------------------------------------
   db:
-    image: postgres:16-alpine
+    image: ${OPENREPO_POSTGRES_IMAGE:-postgres:16-alpine}
     expose:
       - "5432"
     restart: unless-stopped
     environment:
-      - POSTGRES_PASSWORD=${OPENREPO_PG_PASSWORD:-postgres}
-      - POSTGRES_USER=${OPENREPO_PG_USERNAME:-postgres}
-      - POSTGRES_DB=${OPENREPO_PG_DATABASE:-openrepo}
+      POSTGRES_PASSWORD: ${OPENREPO_PG_PASSWORD:-postgres}
+      POSTGRES_USER: ${OPENREPO_PG_USERNAME:-postgres}
+      POSTGRES_DB: ${OPENREPO_PG_DATABASE:-openrepo}
     volumes:
       - openrepo-db:/var/lib/postgresql/data
     healthcheck:

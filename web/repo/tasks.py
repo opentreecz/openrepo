@@ -5,11 +5,49 @@ with Celery's managed task queue, providing retry logic, rate limiting,
 monitoring, and horizontal scaling.
 """
 import logging
+import threading
 
 from celery import shared_task
 from django.db import close_old_connections
 
 logger = logging.getLogger("openrepo_web")
+
+
+def _process_upload_in_thread(task_id):
+    from repo.api.upload_processor import process_upload
+    try:
+        process_upload(task_id)
+    finally:
+        close_old_connections()
+
+
+def dispatch_upload_processing(task_id):
+    """Queue background processing of a stored upload.
+
+    Normally the work is handed to a Celery worker through the broker
+    (Redis).  If the broker cannot be reached (Redis not running, wrong
+    ``OPENREPO_REDIS_URL``, ...) the upload is processed in a local
+    background thread instead of failing the request with HTTP 500, so the
+    client can still poll ``/api/upload-status/<task_id>/``.
+
+    Returns ``"celery"`` or ``"thread"`` depending on the path taken.
+    """
+    try:
+        process_upload_task.delay(task_id)
+        return "celery"
+    except Exception as exc:  # kombu.exceptions.OperationalError, redis errors, DNS errors
+        logger.warning(
+            "Celery broker unavailable (%s); processing upload %s in-process. "
+            "Check OPENREPO_REDIS_URL and that the redis and worker services are running.",
+            exc, task_id,
+        )
+        threading.Thread(
+            target=_process_upload_in_thread,
+            args=(task_id,),
+            name=f"upload-{task_id}",
+            daemon=True,
+        ).start()
+        return "thread"
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)

@@ -32,6 +32,7 @@ from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
 
 from repo.models import Build, BuildLogLine, Package, PGPSigningKey, Repository, UploadTask
+from repo.tasks import dispatch_upload_processing
 from repo.storage.filemanager import RepoFileManager
 from repo.storage.keyring import PGPKeyManager
 
@@ -494,8 +495,7 @@ class UploadViewSet(viewsets.ViewSet):
             sha256=sha256,
         )
 
-        from repo.tasks import process_upload_task
-        process_upload_task.delay(str(task.pk))
+        dispatch_upload_processing(str(task.pk))
 
         return Response({"task_id": str(task.pk)}, status=rest_framework.status.HTTP_202_ACCEPTED)
 

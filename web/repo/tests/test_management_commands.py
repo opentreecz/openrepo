@@ -165,4 +165,24 @@ class RunWorkerCommandTestCase(TestCase):
         self.assertIn("celery", args)
         self.assertIn("worker", args)
         self.assertIn("--concurrency=2", args)
+        self.assertIn("--beat", args)
         self.assertIn("Worker exited", out.getvalue())
+
+    @patch("repo.management.commands.runworker.subprocess.run")
+    def test_command_runs_from_project_dir(self, mock_run):
+        """runworker runs celery from the Django project dir so 'openrepo' is importable"""
+        from django.conf import settings
+        from django.core.management import call_command
+
+        call_command("runworker", stdout=StringIO())
+        kwargs = mock_run.call_args.kwargs
+        self.assertEqual(kwargs["cwd"], str(settings.BASE_DIR))
+        self.assertIn(str(settings.BASE_DIR), kwargs["env"]["PYTHONPATH"].split(os.pathsep))
+
+    @patch("repo.management.commands.runworker.subprocess.run")
+    def test_command_no_beat(self, mock_run):
+        """runworker --no-beat omits the embedded beat scheduler"""
+        from django.core.management import call_command
+
+        call_command("runworker", no_beat=True, stdout=StringIO())
+        self.assertNotIn("--beat", mock_run.call_args[0][0])

@@ -239,7 +239,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "OpenRepo API",
     "DESCRIPTION": "Package repository management API for Debian APT, RPM, Alpine APK, and generic file repositories.",
-    "VERSION": "2.9.4",
+    "VERSION": "2.10.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "LICENSE": {"name": "AGPL-3.0", "url": "https://www.gnu.org/licenses/agpl-3.0.html"},
@@ -338,6 +338,16 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# Fail fast when publishing from the web process if the broker is down, so the
+# upload view can fall back to in-process handling instead of hanging/500-ing.
+CELERY_BROKER_CONNECTION_TIMEOUT = float(os.getenv("OPENREPO_BROKER_CONNECTION_TIMEOUT", "5"))
+CELERY_TASK_PUBLISH_RETRY_POLICY = {
+    "max_retries": int(os.getenv("OPENREPO_BROKER_PUBLISH_RETRIES", "2")),
+    "interval_start": 0,
+    "interval_step": 0.5,
+    "interval_max": 1,
+}
 
 # Make Celery tasks execute synchronously during tests.
 # Auto-detect test mode: Django sets up an in-memory DB or the test runner
