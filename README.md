@@ -1,7 +1,5 @@
-# openrepo
-
 <p align="center">
-  <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="200"/>
+  <img src="docs/assets/openrepo-logo.svg" alt="OpenRepo" width="420"/>
 </p>
 
 <p align="center">

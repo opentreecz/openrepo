@@ -5,7 +5,7 @@ nav_order: 1
 ---
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/opentreecz/.github/master/profile/img/opentreeczlogo.jpeg" alt="opentree.cz" width="150"/>
+  <img src="assets/logo.png" alt="OpenRepo" width="150" height="150">
 </p>
 
 # OpenRepo
