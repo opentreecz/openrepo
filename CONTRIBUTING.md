@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/assets/openrepo-logo.svg" alt="OpenRepo" width="360">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openrepo-logo-dark.svg">
+    <img src="docs/assets/openrepo-logo.svg" alt="OpenRepo" width="360">
+  </picture>
 </p>
 
 > **Full documentation:** [opentreecz.github.io/openrepo](https://opentreecz.github.io/openrepo/)

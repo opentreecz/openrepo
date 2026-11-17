@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="docs/assets/openrepo-logo.svg" alt="OpenRepo" width="420"/>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openrepo-logo-dark.svg">
+    <img src="docs/assets/openrepo-logo.svg" alt="OpenRepo" width="420">
+  </picture>
 </p>
 
 <p align="center">
