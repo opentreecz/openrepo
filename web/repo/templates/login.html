@@ -13,7 +13,10 @@
         {% csrf_token %}
         <!-- Email input -->
         <div class="row mb-4">
-          <img src="{% static 'openrepo_logo.svg' %}" alt="OpenRepo Logo" class="mx-auto d-block" width="70%">
+          <picture class="mx-auto d-block" style="width: 70%;">
+            <source media="(prefers-color-scheme: dark)" srcset="{% static 'openrepo_logo-dark.svg' %}">
+            <img src="{% static 'openrepo_logo.svg' %}" alt="OpenRepo Logo" class="mx-auto d-block" width="100%">
+          </picture>
         </div>
         <div class="form-outline mb-4">
           <!-- <input type="email" id="form2Example1" class="form-control" /> -->
