@@ -21,7 +21,7 @@
                 <span><router-link to="/"><v-img
 
                     width="120"
-                    src="/assets/openrepo_logo.svg"
+                    :src="isDark ? '/assets/openrepo_logo-dark.svg' : '/assets/openrepo_logo.svg'"
                 ></v-img></router-link></span>
             </v-toolbar-title>
             <v-spacer></v-spacer>
