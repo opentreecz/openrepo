@@ -35,8 +35,10 @@ class BaseRepoAdapter:
     BUILDLOG_ERROR = "error"
 
     # Subprocess timeout in seconds — prevents indefinite hangs from
-    # createrepo, apt-ftparchive, or gpg.
-    SUBPROCESS_TIMEOUT = 600
+    # createrepo, apt-ftparchive, or gpg.  A timed-out apt-ftparchive is
+    # killed before it saves its checksum cache, so a cold build of a large
+    # repo must fit in this window or every later build will start cold too.
+    SUBPROCESS_TIMEOUT = int(os.environ.get("OPENREPO_SUBPROCESS_TIMEOUT", "3600"))
 
     def __init__(self, repo_db_obj=None, *, repo_uid=None, packages=None, config=None,
                  build_logger=None, signing_key=None, signer=None, base_url="",
