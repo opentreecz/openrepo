@@ -85,6 +85,10 @@ Copy `.env.example` to `.env` and configure before starting:
 | `OPENREPO_CELERY_EAGER` | `0` | Set `1` for synchronous tasks in development/tests only |
 | `OPENREPO_DISABLE_THROTTLE` | `0` | Set `1` to disable API throttling in development/tests |
 | `OPENREPO_USE_PYTHON_TOOLS` | `0` | Set `1` to use pure-Python Debian/RPM repository tooling |
+| `OPENREPO_CLEANUP_INTERVAL` | `86400` | Seconds between automatic storage cleanups; `0` disables them ([Maintenance & Cleanup](maintenance.md)) |
+| `OPENREPO_CLEANUP_DRY_RUN` | `0` | Set `1` so automatic cleanups only log what they would remove |
+| `OPENREPO_CLEANUP_GRACE_HOURS` | `24` | Minimum age before files/uploads/builds/publish dirs count as abandoned |
+| `OPENREPO_CLEANUP_HISTORY_DAYS` | `90` | Delete finished upload tasks and builds older than this; `0` keeps them |
 | `OPENREPO_SUBPROCESS_TIMEOUT` | `3600` | Seconds before a repo build tool (`apt-ftparchive`, `createrepo_c`, `gpg`) is killed. Must cover a cold (uncached) build of the largest repo |
 | `RPM_VERSION_IGNORE_BUILD_NUM` | `false` | Set `true` to strip the RPM release (build number) suffix from versions |
 

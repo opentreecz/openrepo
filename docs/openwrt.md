@@ -1,7 +1,7 @@
 ---
 layout: default
 title: OpenWrt Deployment
-nav_order: 9
+nav_order: 10
 ---
 
 <p align="center">

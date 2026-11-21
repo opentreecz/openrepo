@@ -141,6 +141,24 @@ curl 'http://localhost:7376/api/builds/?repo__repo_uid=myapp-dev' \
 
 ---
 
+## Maintenance endpoint
+
+```
+POST   /api/cleanup/      Remove unused files, abandoned uploads, stale builds/publish dirs (superuser)
+```
+
+Dry-run unless `"dry_run": false`; optional `grace_hours` and `history_days`.
+Returns a report and `409 CLEANUP_BUSY` while another cleanup runs. See
+[Maintenance & Cleanup](maintenance.md).
+
+```bash
+curl -X POST http://localhost:7376/api/cleanup/ \
+  -H 'Authorization: Token <superuser-token>' \
+  -H 'Content-Type: application/json' -d '{"dry_run": true}'
+```
+
+---
+
 ## Auth endpoint
 
 ```

@@ -189,7 +189,7 @@ class RepoDetailSerializer(serializers.HyperlinkedModelSerializer):
             disallowed_names = [
                 "back", "api", "admin", "api-auth", "static",
                 "users", "repos", "signingkeys", "builds", "buildlogs",
-                "whoami", "upload-status", "packages", "pkg",
+                "whoami", "upload-status", "packages", "pkg", "health", "cleanup",
             ]
             if attrs["repo_uid"] in disallowed_names:
                 raise serializers.ValidationError(
@@ -307,6 +307,41 @@ class UploadSerializer(serializers.Serializer):
 class UploadResponseSerializer(serializers.Serializer):
     """Response returned by the upload endpoint (HTTP 202 Accepted)."""
     task_id = serializers.UUIDField(help_text="ID for polling upload status via /api/upload-status/<task_id>/")
+
+
+class CleanupRequestSerializer(serializers.Serializer):
+    """Request body for POST /api/cleanup/."""
+    dry_run = serializers.BooleanField(
+        default=True, help_text="Only report what would be removed (default: true)"
+    )
+    grace_hours = serializers.IntegerField(
+        required=False, min_value=0,
+        help_text="Minimum age of data considered abandoned (default: OPENREPO_CLEANUP_GRACE_HOURS)",
+    )
+    history_days = serializers.IntegerField(
+        required=False, min_value=0,
+        help_text="Delete finished upload tasks/builds older than this; 0 keeps them "
+                  "(default: OPENREPO_CLEANUP_HISTORY_DAYS)",
+    )
+
+
+class CleanupReportSerializer(serializers.Serializer):
+    """Result of a cleanup run."""
+    dry_run = serializers.BooleanField()
+    abandoned_uploads = serializers.IntegerField(help_text="Upload tasks that never finished processing")
+    stale_builds = serializers.IntegerField(help_text="Builds left in 'running' state")
+    orphan_files = serializers.IntegerField(help_text="Package files referenced by nothing")
+    orphan_bytes = serializers.IntegerField()
+    empty_dirs = serializers.IntegerField()
+    stale_publish_dirs = serializers.ListField(child=serializers.CharField())
+    unmanaged_publish_dirs = serializers.ListField(
+        child=serializers.CharField(),
+        help_text="Publish directories of repos not in the database (reported, never deleted)",
+    )
+    old_upload_tasks = serializers.IntegerField()
+    old_builds = serializers.IntegerField()
+    skipped = serializers.ListField(child=serializers.CharField())
+    errors = serializers.ListField(child=serializers.CharField())
 
 
 class ErrorResponseSerializer(serializers.Serializer):

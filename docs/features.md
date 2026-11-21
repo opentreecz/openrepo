@@ -70,6 +70,16 @@ Packages that are referenced by another repository are **never deleted** regardl
 
 ---
 
+## Storage cleanup
+
+Unused data is garbage-collected daily: package files that nothing references,
+uploads whose processing was lost, builds stuck in `running`, publish
+directories left by failed builds, and old upload-task/build history. Run it
+on demand with `manage.py cleanup` or `POST /api/cleanup/`. Dry-run is the
+default for both. See [Maintenance & Cleanup](maintenance.md).
+
+---
+
 ## Package promotion
 
 Each repository can be configured with a **Promote destination** repo in Repo Settings.

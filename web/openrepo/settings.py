@@ -239,7 +239,7 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "OpenRepo API",
     "DESCRIPTION": "Package repository management API for Debian APT, RPM, Alpine APK, and generic file repositories.",
-    "VERSION": "2.10.5",
+    "VERSION": "2.11.0",
     "SERVE_INCLUDE_SCHEMA": False,
     "COMPONENT_SPLIT_REQUEST": True,
     "LICENSE": {"name": "AGPL-3.0", "url": "https://www.gnu.org/licenses/agpl-3.0.html"},
@@ -372,3 +372,12 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": float(os.getenv("OPENREPO_STALE_CHECK_INTERVAL", "60")),
     },
 }
+
+# Storage/database cleanup (repo.cleanup). 0 disables the periodic run;
+# `manage.py cleanup` and POST /api/cleanup/ keep working.
+OPENREPO_CLEANUP_INTERVAL = float(os.getenv("OPENREPO_CLEANUP_INTERVAL", "86400"))
+if OPENREPO_CLEANUP_INTERVAL > 0:
+    CELERY_BEAT_SCHEDULE["cleanup"] = {
+        "task": "repo.tasks.cleanup_task",
+        "schedule": OPENREPO_CLEANUP_INTERVAL,
+    }

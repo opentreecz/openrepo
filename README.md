@@ -188,6 +188,21 @@ Packages that are referenced by another repository are never deleted regardless 
 
 > **Upgrading from an older version:** The `keep_only_latest` boolean flag has been replaced by retention policies. Existing repos that had `keep_only_latest=True` are automatically migrated to `retention_policy=keep_latest_n` with `retention_keep_count=1` — no manual action required.
 
+### Storage cleanup
+
+A daily cleanup job garbage-collects data nothing uses any more: package files
+that no package references, uploads whose processing was lost, builds stuck in
+`running`, publish directories left behind by failed builds, and old
+upload-task/build history. It never touches files that a package, an
+in-flight upload or a published repo still references.
+
+    docker compose exec worker python manage.py cleanup           # dry-run report
+    docker compose exec worker python manage.py cleanup --apply   # delete
+
+Tune it with `OPENREPO_CLEANUP_INTERVAL`, `OPENREPO_CLEANUP_DRY_RUN`,
+`OPENREPO_CLEANUP_GRACE_HOURS` and `OPENREPO_CLEANUP_HISTORY_DAYS`. See
+[Maintenance & Cleanup](docs/maintenance.md).
+
 ### Package promotion
 
 Each repository can be configured with a **Promote destination** repo.  Clicking "Promote" copies selected packages to that destination, making it easy to move packages through a pipeline (e.g. `dev → staging → production`).
@@ -253,6 +268,10 @@ To add a new user:
 ### Auth
 
     GET    /api/whoami                              # Current user info + API token
+
+### Maintenance
+
+    POST   /api/cleanup/                            # Storage/database cleanup (superuser, dry-run by default)
 
 All endpoints require a token in the `Authorization` header:
 

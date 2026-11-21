@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OpenRepo API
-  version: 2.10.5
+  version: 2.11.0
   description: Package repository management API for Debian APT, RPM, Alpine APK,
     and generic file repositories.
   license:
@@ -812,6 +812,57 @@ paths:
                   detail:
                     type: string
                     example: You do not have permission to perform this action.
+  /api/cleanup/:
+    post:
+      operationId: cleanup_create
+      description: Remove package files referenced by nothing, abandoned uploads,
+        builds stuck in 'running', stale publish directories and old upload-task/build
+        history. Dry-run unless dry_run=false. Superuser only.
+      tags:
+      - maintenance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanupRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CleanupRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CleanupRequestRequest'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupReport'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          description: Authentication credentials were not provided or are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Authentication credentials were not provided.
   /api/health/:
     get:
       operationId: health_retrieve
@@ -2616,6 +2667,57 @@ paths:
                   detail:
                     type: string
                     example: You do not have permission to perform this action.
+  /api/v1/cleanup/:
+    post:
+      operationId: v1_cleanup_create
+      description: Remove package files referenced by nothing, abandoned uploads,
+        builds stuck in 'running', stale publish directories and old upload-task/build
+        history. Dry-run unless dry_run=false. Superuser only.
+      tags:
+      - maintenance
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CleanupRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CleanupRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CleanupRequestRequest'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CleanupReport'
+          description: ''
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+          description: ''
+        '401':
+          description: Authentication credentials were not provided or are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Authentication credentials were not provided.
   /api/v1/health/:
     get:
       operationId: v1_health_retrieve
@@ -3800,6 +3902,77 @@ components:
       - line_number
       - loglevel
       - timestamp
+    CleanupReport:
+      type: object
+      description: Result of a cleanup run.
+      properties:
+        dry_run:
+          type: boolean
+        abandoned_uploads:
+          type: integer
+          description: Upload tasks that never finished processing
+        stale_builds:
+          type: integer
+          description: Builds left in 'running' state
+        orphan_files:
+          type: integer
+          description: Package files referenced by nothing
+        orphan_bytes:
+          type: integer
+        empty_dirs:
+          type: integer
+        stale_publish_dirs:
+          type: array
+          items:
+            type: string
+        unmanaged_publish_dirs:
+          type: array
+          items:
+            type: string
+          description: Publish directories of repos not in the database (reported,
+            never deleted)
+        old_upload_tasks:
+          type: integer
+        old_builds:
+          type: integer
+        skipped:
+          type: array
+          items:
+            type: string
+        errors:
+          type: array
+          items:
+            type: string
+      required:
+      - abandoned_uploads
+      - dry_run
+      - empty_dirs
+      - errors
+      - old_builds
+      - old_upload_tasks
+      - orphan_bytes
+      - orphan_files
+      - skipped
+      - stale_builds
+      - stale_publish_dirs
+      - unmanaged_publish_dirs
+    CleanupRequestRequest:
+      type: object
+      description: Request body for POST /api/cleanup/.
+      properties:
+        dry_run:
+          type: boolean
+          default: true
+          description: 'Only report what would be removed (default: true)'
+        grace_hours:
+          type: integer
+          minimum: 0
+          description: 'Minimum age of data considered abandoned (default: OPENREPO_CLEANUP_GRACE_HOURS)'
+        history_days:
+          type: integer
+          minimum: 0
+          description: 'Delete finished upload tasks/builds older than this; 0 keeps
+            them (default: OPENREPO_CLEANUP_HISTORY_DAYS)'
     CopyRequest:
       type: object
       description: Request body for copying a package to another repository.

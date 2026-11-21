@@ -168,3 +168,22 @@ def check_stale_repos():
         if is_build_running(repo_uid):
             continue
         enqueue_rebuild(repo_uid)
+
+
+@shared_task
+def cleanup_task():
+    """Periodic storage/database cleanup (see ``repo.cleanup``).
+
+    Deletes only when ``OPENREPO_CLEANUP_DRY_RUN`` is off (the default);
+    otherwise it just logs what would be removed.
+    """
+    import os
+
+    close_old_connections()
+    from repo.cleanup import CleanupBusy, CleanupOptions, run_cleanup
+
+    dry_run = os.getenv("OPENREPO_CLEANUP_DRY_RUN", "0").strip().lower() in ("1", "true", "yes")
+    try:
+        run_cleanup(CleanupOptions(dry_run=dry_run))
+    except CleanupBusy:
+        logger.info("Cleanup already running; skipping this pass")

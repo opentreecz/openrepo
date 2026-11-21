@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Bare-Metal Deployment
-nav_order: 8
+nav_order: 9
 ---
 
 <p align="center">

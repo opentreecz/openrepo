@@ -25,6 +25,9 @@ web/
     models.py            — Repository, Package, PGPSigningKey, Build, UploadTask
     views.py             — Web views
     signals.py           — Package add/delete signals (mark repo stale)
+    cleanup.py           — Storage/DB garbage collection (orphan files, abandoned uploads,
+                           stale builds/publish dirs, history); manage.py cleanup,
+                           tasks.cleanup_task, POST /api/cleanup/ — docs/maintenance.md
     api/
       views.py           — DRF viewsets (15 endpoint groups, incl. HealthCheckView)
       urls.py            — API URL routing

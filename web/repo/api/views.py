@@ -41,6 +41,8 @@ from .filters import BuildFilter, BuildLogFilter
 from .serializers import (
     BuildLogSerializer,
     BuildSerializer,
+    CleanupReportSerializer,
+    CleanupRequestSerializer,
     CopySerializer,
     ErrorResponseSerializer,
     PackageDetailSerializer,
@@ -549,6 +551,40 @@ class UploadStatusView(viewsets.ViewSet):
 
         serializer = UploadTaskSerializer(task, context={"request": request})
         return Response(serializer.data)
+
+
+class CleanupView(viewsets.ViewSet):
+    """Run the storage/database cleanup (superuser only)."""
+    serializer_class = CleanupRequestSerializer
+
+    @extend_schema(
+        description=(
+            "Remove package files referenced by nothing, abandoned uploads, builds stuck in "
+            "'running', stale publish directories and old upload-task/build history. "
+            "Dry-run unless dry_run=false. Superuser only."
+        ),
+        request=CleanupRequestSerializer,
+        responses={200: CleanupReportSerializer, 403: ErrorResponseSerializer, 409: ErrorResponseSerializer},
+        tags=["maintenance"],
+    )
+    def create(self, request):
+        from repo.cleanup import CleanupBusy, CleanupOptions, run_cleanup
+
+        if not request.user.is_superuser:
+            raise rest_framework.exceptions.PermissionDenied("Cleanup requires a superuser API key")
+
+        params = CleanupRequestSerializer(data=request.data)
+        params.is_valid(raise_exception=True)
+        opts = CleanupOptions(dry_run=params.validated_data["dry_run"])
+        for name in ("grace_hours", "history_days"):
+            if name in params.validated_data:
+                setattr(opts, name, params.validated_data[name])
+
+        try:
+            report = run_cleanup(opts)
+        except CleanupBusy as exc:
+            return api_error(ApiErrorCode.CLEANUP_BUSY, str(exc), rest_framework.status.HTTP_409_CONFLICT)
+        return Response(CleanupReportSerializer(report.as_dict()).data)
 
 
 class HealthCheckView(viewsets.ViewSet):
