@@ -65,10 +65,8 @@ class GenericRepoAdapter(BaseRepoAdapter):
         """Generate a single-page HTML index listing all packages with metadata."""
         rows = []
         # Sort packages by name then by upload_date desc
-        sorted_pkgs = sorted(
-            self.packages,
-            key=lambda p: (p.package_name, -(p.upload_date or "") if isinstance(p.upload_date, str) else ""),
-        )
+        sorted_pkgs = sorted(self.packages, key=lambda p: str(p.upload_date or ""), reverse=True)
+        sorted_pkgs.sort(key=lambda p: p.package_name)
         for pkg in sorted_pkgs:
             # Support both PackageInfo (string attr) and Django Package model (method)
             rel_path = pkg.relative_path

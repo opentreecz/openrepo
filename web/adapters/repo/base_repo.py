@@ -271,7 +271,7 @@ class BaseRepoAdapter:
                         cwd=working_dir,
                         env=custom_env,
                         stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
+                        stderr=subprocess.PIPE if output_file else subprocess.STDOUT,
                         text=True,
                         timeout=self.SUBPROCESS_TIMEOUT,
                     )
@@ -286,7 +286,10 @@ class BaseRepoAdapter:
                     output_path = os.path.join(repo_path, output_file)
                     with open(output_path, "w") as f:
                         f.write(proc_status.stdout)
-                    log_entry.set_message(f"Wrote {output_file}")
+                    message = f"Wrote {output_file}"
+                    if proc_status.stderr:
+                        message += "\n" + proc_status.stderr.rstrip()
+                    log_entry.set_message(message)
                 else:
                     log_entry.set_message(proc_status.stdout)
 

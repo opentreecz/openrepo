@@ -92,13 +92,14 @@ class GenericRepoAdapterTests(TempSettingsMixin, TestCase):
     def test_generates_md5_and_index(self):
         """With packages, the adapter generates .md5 files and a populated index."""
         self._create_package("tool", "1.0.0", content=b"tool v1")
-        self._create_package("tool", "2.0.0", content=b"tool v2")
+        newer = self._create_package("tool", "2.0.0", content=b"tool v2")
+        newer.upload_date = "2025-06-15T12:00:00Z"
+        newer.save(update_fields=["upload_date"])
 
         adapter = GenericRepoAdapter(self.repo)
         adapter.build = Build.objects.create(
             repo=self.repo, build_number=1, completion_status=Build.STATUS_RUNNING
         )
-        adapter.packages = Package.objects.filter(repo=self.repo)
 
         repo_path = os.path.join(self.test_dir, "output")
         os.makedirs(repo_path)
@@ -127,6 +128,7 @@ class GenericRepoAdapterTests(TempSettingsMixin, TestCase):
         self.assertIn("generic-test", html_content)
         self.assertIn("tool_1.0.0_any.bin", html_content)
         self.assertIn("tool_2.0.0_any.bin", html_content)
+        self.assertLess(html_content.index("tool_2.0.0_any.bin"), html_content.index("tool_1.0.0_any.bin"))
         self.assertIn("2 package(s)", html_content)
 
     def test_no_pgp_signing_without_key(self):

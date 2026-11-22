@@ -2,6 +2,7 @@
 import datetime
 import os
 import subprocess
+import sys
 from unittest.mock import MagicMock, patch
 
 from django.conf import settings
@@ -274,27 +275,22 @@ class BaseRepoAdapterBuildLogTestCase(TempSettingsMixin, TestCase):
         )
         self.assertEqual(mock_run.call_count, 1)
 
-    @patch("subprocess.run")
-    def test_execute_commands_writes_stdout_to_output_file(self, mock_run):
-        """_execute_commands writes stdout to output_file when specified"""
-        mock_proc = MagicMock()
-        mock_proc.returncode = 0
-        mock_proc.stdout = "generated content"
-        mock_run.return_value = mock_proc
-
+    def test_execute_commands_keeps_stderr_out_of_generated_index(self):
         adapter = self._make_adapter()
         output_dir = os.path.join(settings.REPO_WWW_PATH, "output_test")
         os.makedirs(output_dir, exist_ok=True)
 
         result = adapter._execute_commands(
-            [(["some-tool", "arg"], "result.txt")],
+            [([sys.executable, "-c", "import sys; print('Package: gh'); print('W: cache reset', file=sys.stderr)"],
+              "Packages")],
             output_dir,
         )
         self.assertTrue(result)
-        output_path = os.path.join(output_dir, "result.txt")
+        output_path = os.path.join(output_dir, "Packages")
         self.assertTrue(os.path.isfile(output_path))
         with open(output_path) as f:
-            self.assertEqual(f.read(), "generated content")
+            self.assertEqual(f.read(), "Package: gh\n")
+        self.assertIn("W: cache reset", BuildLogLine.objects.get().message)
 
     @patch("subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="slow", timeout=600))
     def test_execute_commands_handles_timeout(self, mock_run):
