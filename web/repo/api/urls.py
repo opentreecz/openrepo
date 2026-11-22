@@ -31,6 +31,10 @@ urlpatterns = [
     path("health/", views.HealthCheckView.as_view({"get": "retrieve"}), name="health-check"),
     path("whoami", views.WhoAmIViewSet.as_view({"get": "retrieve"})),
     path("cleanup/", views.CleanupView.as_view({"post": "create"}), name="cleanup"),
+    path("maintenance/storage-audits/", views.StorageAuditView.as_view({"post": "create"})),
+    path("maintenance/storage-audits/<uuid:audit_id>/", views.StorageAuditView.as_view({"get": "retrieve"})),
+    path("maintenance/storage-audits/<uuid:audit_id>/manifest/", views.StorageAuditView.as_view({"get": "manifest"})),
+    path("maintenance/storage-audits/<uuid:audit_id>/findings/", views.StorageAuditView.as_view({"get": "findings"})),
     path(r"upload-status/<uuid:task_id>/", views.UploadStatusView.as_view({"get": "retrieve"}), name="upload-status"),
     path(
         r"<slug:repo_uid>/",

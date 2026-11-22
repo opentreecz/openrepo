@@ -138,13 +138,13 @@ def _older_than(path, cutoff_ts):
         return False
 
 
-def _published_targets():
+def _published_targets(onerror=None):
     """Storage paths referenced by symlinks anywhere in the publish tree."""
     targets = set()
     www = settings.REPO_WWW_PATH
     if not os.path.isdir(www):
         return targets
-    for root, dirs, files in os.walk(www):
+    for root, dirs, files in os.walk(www, onerror=onerror):
         for name in files + dirs:
             path = os.path.join(root, name)
             if os.path.islink(path) and os.path.normpath(root) != os.path.normpath(www):
@@ -154,7 +154,7 @@ def _published_targets():
     return targets
 
 
-def _referenced_files(cutoff):
+def _referenced_files(cutoff, onerror=None):
     """Storage paths that must be kept.
 
     Upload tasks older than *cutoff* are abandoned and no longer protect
@@ -172,7 +172,7 @@ def _referenced_files(cutoff):
         rel = _storage_relpath(stored_path)
         if rel:
             referenced.add(rel)
-    referenced |= _published_targets()
+    referenced |= _published_targets(onerror)
     return referenced
 
 

@@ -24,6 +24,12 @@ import UserInfo from '@/views/user_info.vue'
 
 const routes = [
   {
+    path: "/cfg/maintenance/",
+    alias: "/cfg/maintenance/storage-audit/",
+    name: "storage_audit",
+    component: () => import('@/views/storage_audit.vue'),
+  },
+  {
     path: "/",
     name: "home",
     component: Home,

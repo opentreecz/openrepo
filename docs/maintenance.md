@@ -55,6 +55,34 @@ cleanup (apply): removed 424 orphan file(s) (59.90 GB), 3 stale publish dir(s), 
 
 ## Running it
 
+### WebUI: Storage audit (report only)
+
+Sign in as a superuser and choose **⋮ → Maintenance → Run storage audit**.
+Run it off-peak: a Celery worker reads live APT, RPM, APK and generic indexes and
+hashes package contents where the index supplies a checksum. The page shows counts,
+candidate bytes and a paginated list. Filter by finding type or path. Check the
+unreferenced files to include in a review list; the selection survives page and
+filter changes until you leave or start another audit. **Export selected list**
+downloads the selected paths, sizes and checksums. The full JSON Lines manifest
+is also available. Neither export performs cleanup.
+
+**Filename needs review** flags literal percent escapes, invisible characters,
+invalid bytes, and leading/trailing whitespace. Similar spellings next to a
+missing indexed path are hints, not identity matches. A normal `~`, `-`, `_`
+or internal space alone does not flag a healthy file. Filename warnings cannot
+be checked for removal.
+Both the web and worker processes must use the same `OPENREPO_VAR_DIR` and data mounts.
+Reports older than one day are pruned on the next audit.
+
+An indexed path missing locally, a checksum mismatch, or a database package not
+reachable through the index is a publication issue. Keep the payload. Candidates
+exclude database references, all in-flight uploads, published symlink targets,
+multiply-linked files, files less than seven days old, and checksum matches for
+broken index entries. Incomplete coverage prevents candidate classification.
+The audit checks local paths, not the HTTP proxy, cached client indexes or direct
+downloads. A candidate is for investigation, not a deletion authorization.
+The page cannot apply cleanup and does not change periodic cleanup settings.
+
 ### Automatically
 
 The Celery beat schedule runs `repo.tasks.cleanup_task` every

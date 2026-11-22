@@ -76,6 +76,7 @@
                 theme: useTheme(),
                 raw_items: [
                     { title: 'User Info', icon: 'mdi-account', to: '/cfg/userinfo/', for_superuser: false},
+                    { title: 'Maintenance', icon: 'mdi-file-search-outline', to: '/cfg/maintenance/', for_superuser: true},
                     { title: 'System Admin', icon: 'mdi-database-cog-outline', href: "/admin/", for_superuser: true},
                     { title: 'Log Out', icon: 'mdi-exit-to-app', href: "/admin/logout/", for_superuser: false },
                 ],

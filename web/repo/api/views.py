@@ -13,16 +13,19 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import hashlib
+import json
 import logging
 import os
 import re
+import uuid
+from pathlib import Path
 
 import rest_framework.exceptions
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.validators import validate_email
 from django.db.models.functions import Lower
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
@@ -30,6 +33,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.response import Response
+from rest_framework.renderers import JSONRenderer
 
 from repo.models import Build, BuildLogLine, Package, PGPSigningKey, Repository, UploadTask
 from repo.tasks import dispatch_upload_processing
@@ -585,6 +589,93 @@ class CleanupView(viewsets.ViewSet):
         except CleanupBusy as exc:
             return api_error(ApiErrorCode.CLEANUP_BUSY, str(exc), rest_framework.status.HTTP_409_CONFLICT)
         return Response(CleanupReportSerializer(report.as_dict()).data)
+
+
+class AuditJSONRenderer(JSONRenderer):
+    # Preserve even surrogate-escaped filenames (invalid UTF-8 on POSIX).
+    ensure_ascii = True
+
+
+class StorageAuditView(viewsets.ViewSet):
+    """Report-only worker job. This endpoint has no apply mode."""
+
+    renderer_classes = [AuditJSONRenderer]
+
+    def check_permissions(self, request):
+        super().check_permissions(request)
+        if not request.user.is_superuser:
+            raise rest_framework.exceptions.PermissionDenied("Storage audits require a superuser")
+
+    @extend_schema(request=None, responses={202: OpenApiTypes.OBJECT}, tags=["maintenance"])
+    def create(self, request):
+        from repo.tasks import storage_audit_task
+        audit_id = str(uuid.uuid4())
+        try:
+            storage_audit_task.apply_async(args=[audit_id], task_id=f"storage-audit-{audit_id}")
+        except Exception:
+            logger.exception("Unable to queue storage audit")
+            return Response({"detail": "Unable to queue audit. Check the worker and broker."}, status=503)
+        return Response({"id": audit_id}, status=202)
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT}, tags=["maintenance"])
+    def retrieve(self, request, audit_id):
+        from repo.tasks import storage_audit_task
+        job = storage_audit_task.AsyncResult(f"storage-audit-{audit_id}")
+        try:
+            state = job.state
+            if state == "SUCCESS":
+                return Response({"state": state, "report": job.result})
+            if state == "FAILURE":
+                return Response({"state": state, "detail": str(job.result)})
+            return Response({"state": state})
+        except Exception:
+            logger.exception("Cannot read storage audit status")
+            return Response({"detail": "Audit status is unavailable."}, status=503)
+
+    @extend_schema(responses={200: OpenApiTypes.BINARY}, tags=["maintenance"])
+    def manifest(self, request, audit_id):
+        path = Path(settings.OPENREPO_VAR_DIR) / "storage-audits" / f"{audit_id}.jsonl"
+        try:
+            stream = path.open("rb")
+        except FileNotFoundError:
+            raise rest_framework.exceptions.NotFound("Report unavailable or expired")
+        return FileResponse(stream, as_attachment=True, filename=f"audit-{audit_id}.jsonl")
+
+    @extend_schema(responses={200: OpenApiTypes.OBJECT}, tags=["maintenance"], parameters=[
+        OpenApiParameter("after", int, description="Byte offset returned by the previous page."),
+        OpenApiParameter("kind", str, description="Exact finding category."),
+        OpenApiParameter("search", str, description="Case-insensitive path substring."),
+    ])
+    def findings(self, request, audit_id):
+        try:
+            offset = int(request.query_params.get("after", 0))
+            if not 0 <= offset < 2**63:
+                raise ValueError
+        except ValueError:
+            raise rest_framework.exceptions.ValidationError("Invalid page offset")
+        kind = request.query_params.get("kind", "")
+        search = request.query_params.get("search", "").casefold()
+        path = Path(settings.OPENREPO_VAR_DIR) / "storage-audits" / f"{audit_id}.jsonl"
+        rows = []
+        try:
+            with path.open("rb") as stream:
+                if offset:
+                    stream.seek(offset - 1)
+                    if stream.read(1) != b"\n":
+                        raise rest_framework.exceptions.ValidationError("Invalid page boundary")
+                while True:
+                    position = stream.tell()
+                    line = stream.readline()
+                    if not line:
+                        return Response({"rows": rows, "next": None})
+                    row = json.loads(line)
+                    if (kind and row["kind"] != kind) or search not in row["path"].casefold():
+                        continue
+                    if len(rows) == 50:
+                        return Response({"rows": rows, "next": position})
+                    rows.append(row)
+        except FileNotFoundError:
+            raise rest_framework.exceptions.NotFound("Report unavailable or expired")
 
 
 class HealthCheckView(viewsets.ViewSet):

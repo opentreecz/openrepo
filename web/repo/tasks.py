@@ -171,6 +171,31 @@ def check_stale_repos():
 
 
 @shared_task
+def storage_audit_task(audit_id):
+    """Keep the full manifest outside the served repository; expire prior reports."""
+    import os
+    import time
+    from pathlib import Path
+    from tempfile import NamedTemporaryFile
+
+    from django.conf import settings
+    from repo.cleanup import _cleanup_lock
+    from repo.storage_audit import audit
+
+    directory = Path(settings.OPENREPO_VAR_DIR) / "storage-audits"
+    directory.mkdir(exist_ok=True, mode=0o700)
+    with _cleanup_lock():
+        for old in directory.glob("*.jsonl"):
+            if old.stat().st_mtime < time.time() - 86400:
+                old.unlink()
+        with NamedTemporaryFile(mode="w", dir=directory, encoding="utf-8") as stream:
+            report = audit(stream)
+            stream.flush()
+            os.link(stream.name, directory / f"{audit_id}.jsonl")
+    return report
+
+
+@shared_task
 def cleanup_task():
     """Periodic storage/database cleanup (see ``repo.cleanup``).
 

@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: OpenRepo API
-  version: 2.11.0
+  version: 2.12.0
   description: Package repository management API for Debian APT, RPM, Alpine APK,
     and generic file repositories.
   license:
@@ -896,6 +896,190 @@ paths:
                     type: integer
                     example: 142
           description: ''
+  /api/maintenance/storage-audits/:
+    post:
+      operationId: maintenance_storage_audits_create
+      description: Report-only worker job. This endpoint has no apply mode.
+      tags:
+      - maintenance
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          description: Authentication credentials were not provided or are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Authentication credentials were not provided.
+        '403':
+          description: You do not have permission to perform this action.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: You do not have permission to perform this action.
+  /api/maintenance/storage-audits/{audit_id}/:
+    get:
+      operationId: maintenance_storage_audits_retrieve
+      description: Report-only worker job. This endpoint has no apply mode.
+      parameters:
+      - in: path
+        name: audit_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - maintenance
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          description: Authentication credentials were not provided or are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Authentication credentials were not provided.
+        '403':
+          description: You do not have permission to perform this action.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: You do not have permission to perform this action.
+  /api/maintenance/storage-audits/{audit_id}/findings/:
+    get:
+      operationId: maintenance_storage_audits_findings_retrieve
+      description: Report-only worker job. This endpoint has no apply mode.
+      parameters:
+      - in: query
+        name: after
+        schema:
+          type: integer
+        description: Byte offset returned by the previous page.
+      - in: path
+        name: audit_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: kind
+        schema:
+          type: string
+        description: Exact finding category.
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Case-insensitive path substring.
+      tags:
+      - maintenance
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          description: Authentication credentials were not provided or are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Authentication credentials were not provided.
+        '403':
+          description: You do not have permission to perform this action.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: You do not have permission to perform this action.
+  /api/maintenance/storage-audits/{audit_id}/manifest/:
+    get:
+      operationId: maintenance_storage_audits_manifest_retrieve
+      description: Report-only worker job. This endpoint has no apply mode.
+      parameters:
+      - in: path
+        name: audit_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - maintenance
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+                format: binary
+          description: ''
+        '401':
+          description: Authentication credentials were not provided or are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Authentication credentials were not provided.
+        '403':
+          description: You do not have permission to perform this action.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: You do not have permission to perform this action.
   /api/repos/:
     get:
       operationId: repos_list
@@ -2750,6 +2934,190 @@ paths:
                   packages:
                     type: integer
                     example: 142
+          description: ''
+        '401':
+          description: Authentication credentials were not provided or are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Authentication credentials were not provided.
+        '403':
+          description: You do not have permission to perform this action.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: You do not have permission to perform this action.
+  /api/v1/maintenance/storage-audits/:
+    post:
+      operationId: v1_maintenance_storage_audits_create
+      description: Report-only worker job. This endpoint has no apply mode.
+      tags:
+      - maintenance
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '202':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          description: Authentication credentials were not provided or are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Authentication credentials were not provided.
+        '403':
+          description: You do not have permission to perform this action.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: You do not have permission to perform this action.
+  /api/v1/maintenance/storage-audits/{audit_id}/:
+    get:
+      operationId: v1_maintenance_storage_audits_retrieve
+      description: Report-only worker job. This endpoint has no apply mode.
+      parameters:
+      - in: path
+        name: audit_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - maintenance
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          description: Authentication credentials were not provided or are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Authentication credentials were not provided.
+        '403':
+          description: You do not have permission to perform this action.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: You do not have permission to perform this action.
+  /api/v1/maintenance/storage-audits/{audit_id}/findings/:
+    get:
+      operationId: v1_maintenance_storage_audits_findings_retrieve
+      description: Report-only worker job. This endpoint has no apply mode.
+      parameters:
+      - in: query
+        name: after
+        schema:
+          type: integer
+        description: Byte offset returned by the previous page.
+      - in: path
+        name: audit_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: kind
+        schema:
+          type: string
+        description: Exact finding category.
+      - in: query
+        name: search
+        schema:
+          type: string
+        description: Case-insensitive path substring.
+      tags:
+      - maintenance
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: ''
+        '401':
+          description: Authentication credentials were not provided or are invalid.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: Authentication credentials were not provided.
+        '403':
+          description: You do not have permission to perform this action.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: You do not have permission to perform this action.
+  /api/v1/maintenance/storage-audits/{audit_id}/manifest/:
+    get:
+      operationId: v1_maintenance_storage_audits_manifest_retrieve
+      description: Report-only worker job. This endpoint has no apply mode.
+      parameters:
+      - in: path
+        name: audit_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - maintenance
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: string
+                format: binary
           description: ''
         '401':
           description: Authentication credentials were not provided or are invalid.
